@@ -1,0 +1,6 @@
+{
+  "name": "MikroTik Client Manager",
+  "description": "Full-stack ISP management system with automatic MikroTik provisioning, ARP binding, bandwidth control, and Telegram bot integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
