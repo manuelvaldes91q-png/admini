@@ -80,6 +80,23 @@ router.post('/settings', authenticate, (req, res) => {
   res.json({ success: true });
 });
 
+router.post('/test-connection', authenticate, async (req, res) => {
+  try {
+    const mtData = await getSyncData();
+    res.json({ 
+      success: true, 
+      message: 'Conexión exitosa', 
+      details: `${mtData.queues.length} colas encontradas` 
+    });
+  } catch (err: any) {
+    res.status(500).json({ 
+      success: false, 
+      error: err.message,
+      tip: 'Verifica que el servicio API (puerto 8728) esté habilitado en /ip service.'
+    });
+  }
+});
+
 // Clients (Protected)
 router.get('/clients', authenticate, async (req, res) => {
   try {

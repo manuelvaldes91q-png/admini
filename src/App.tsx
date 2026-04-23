@@ -205,6 +205,24 @@ export default function App() {
     }
   };
 
+  const handleTestConnection = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/test-connection', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert('CONEXIÓN EXITOSA: ' + data.details);
+        fetchData();
+      } else {
+        alert('ERROR DE CONEXIÓN: ' + data.error + '\n\nTIP: ' + (data.tip || ''));
+      }
+    } catch (err: any) {
+      alert('Error de red: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredClients = clients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.ip.includes(searchTerm) || 
@@ -611,12 +629,21 @@ export default function App() {
                     onChange={(e) => setConfig({ ...config, tg_token: e.target.value })}
                   />
                 </div>
-                <button 
-                  onClick={updateSettings}
-                  className="w-full bg-[#ff7800] hover:bg-[#ff8c24] text-black font-bold py-3 text-xs uppercase tracking-widest transition-all"
-                >
-                  Confirmar y Guardar Cambios
-                </button>
+                <div className="flex flex-col md:flex-row gap-4">
+                  <button 
+                    onClick={updateSettings}
+                    className="flex-1 bg-[#ff7800] hover:bg-[#ff8c24] text-black font-bold py-3 text-xs uppercase tracking-widest transition-all"
+                  >
+                    Confirmar y Guardar Cambios
+                  </button>
+                  <button 
+                    onClick={handleTestConnection}
+                    className="bg-[#2a2c31] hover:bg-[#3a3f4b] text-white font-bold py-3 px-6 text-xs uppercase tracking-widest border border-[#3a3f4b] transition-all flex items-center justify-center gap-2"
+                  >
+                    <Activity size={14} className="text-[#ff7800]" />
+                    Probar Conexión
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
