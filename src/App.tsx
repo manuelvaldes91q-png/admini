@@ -71,6 +71,7 @@ export default function App() {
 
   useEffect(() => {
     checkAuth();
+    handleSync();
   }, []);
 
   const checkAuth = async () => {
@@ -200,7 +201,8 @@ export default function App() {
     try {
       const res = await fetch('/api/sync');
       if (res.ok) {
-        setSyncData(await res.json());
+        const data = await res.json();
+        setSyncData(data);
       } else {
         alert('Error al sincronizar');
       }
@@ -210,6 +212,15 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const handleRegisterFromDiscovery = (ip: string, mac: string, host: string) => {
+    setNewClient({ name: host, ip, mac, plan_id: '1' });
+    setShowAddModal(true);
+  };
+
+  const unregisteredLeases = syncData?.leases?.filter((l: any) => 
+    !clients.some(c => c.mac.toLowerCase() === l['mac-address'].toLowerCase() || c.ip === l.address)
+  ) || [];
 
   const handleTestConnection = async () => {
     setLoading(true);
@@ -427,6 +438,39 @@ export default function App() {
                 </div>
               ))}
             </div>
+
+            {/* Discovery Section */}
+            {unregisteredLeases.length > 0 && (
+              <div className="bg-[#181b1e] border border-blue-500/30 overflow-hidden">
+                <div className="p-3 border-b border-blue-500/20 bg-blue-500/5 flex items-center justify-between">
+                  <h3 className="text-[10px] font-bold uppercase flex items-center gap-2 text-blue-400 tracking-widest">
+                    <Search size={14} /> Descubrimiento: IPs Automáticas (Dynamic Leases)
+                  </h3>
+                  <span className="text-[9px] bg-blue-500 text-black px-2 py-0.5 font-black rounded-full italic">
+                    {unregisteredLeases.length} NUEVOS
+                  </span>
+                </div>
+                <div className="p-4 flex gap-4 overflow-x-auto custom-scrollbar whitespace-nowrap">
+                  {unregisteredLeases.map((lease: any, idx: number) => (
+                    <motion.div 
+                      key={idx} 
+                      whileHover={{ scale: 1.02 }}
+                      onClick={() => handleRegisterFromDiscovery(lease.address, lease['mac-address'], lease['host-name'] || 'Cliente-IP-' + lease.address)}
+                      className="inline-block bg-[#0b0c10] border border-[#2a2c31] p-4 min-w-[200px] cursor-pointer hover:border-blue-500 transition-all group"
+                    >
+                      <p className="text-[#56d64d] font-mono font-bold text-sm group-hover:text-blue-400">{lease.address}</p>
+                      <p className="text-[9px] text-[#8e8e8e] font-mono mt-1 uppercase">{lease['mac-address']}</p>
+                      <div className="mt-3 flex justify-between items-center">
+                        <span className="text-[8px] text-[#444] font-bold uppercase truncate max-w-[100px]">{lease['host-name'] || 'Sin nombre'}</span>
+                        <div className="bg-blue-500 p-1 rounded-sm group-hover:bg-blue-400 transition-colors">
+                          <Plus size={10} className="text-black" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Clients Panel */}
             <div className="bg-[#181b1e] border border-[#2a2c31]">

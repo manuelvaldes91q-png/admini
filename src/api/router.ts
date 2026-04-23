@@ -100,29 +100,13 @@ router.post('/test-connection', authenticate, async (req, res) => {
 // Clients (Protected)
 router.get('/clients', authenticate, async (req, res) => {
   try {
-    // RECONCILE START: Automatic intelligent discovery
     const mtData = await getSyncData();
-    const { leases, arp, queues } = mtData;
+    const { arp, queues } = mtData;
 
-    // 1. Process DHCP Leases (Discovery)
-    for (const lease of leases) {
-      const ip = lease.address;
-      const mac = lease['mac-address'];
-      const hostName = lease['host-name'] || lease.comment || 'Dispositivo Descubierto';
-      
-      const existing = db.prepare('SELECT id FROM clients WHERE mac = ? OR ip = ?').get(mac, ip) as any;
-      if (!existing) {
-        db.prepare('INSERT INTO clients (id, name, mac, ip, plan_id, status, total_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .run('disc_' + Math.random().toString(36).substr(2, 6), hostName, mac, ip, '1', 'inactive', '0');
-      }
-    }
-
-    // 2. Sync existing Queues status
+    // Sync existing Queues status
     for (const q of queues) {
       const name = q.name;
       const ip = q.target.split('/')[0];
-      const maxLimit = q['max-limit'];
-      const [up, down] = maxLimit.split('/');
       
       const arpEntry = arp.find((a: any) => a.address === ip);
       const isEnabled = arpEntry ? arpEntry.disabled === 'false' : true;
