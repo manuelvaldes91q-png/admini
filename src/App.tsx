@@ -17,7 +17,8 @@ import {
   Lock,
   LogOut,
   User,
-  Trash2
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -61,6 +62,8 @@ export default function App() {
 
   // Form states
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [newClient, setNewClient] = useState({ name: '', mac: '', ip: '', plan_id: '1' });
   const [config, setConfig] = useState<Record<string, string>>({});
 
@@ -238,6 +241,31 @@ export default function App() {
       }
     } catch (err) {
       alert('Delete failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClient) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/clients/${selectedClient.id}/plan`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_id: selectedClient.plan_id })
+      });
+      if (res.ok) {
+        setShowEditModal(false);
+        fetchData();
+      } else {
+        const data = await res.json();
+        alert('Error: ' + data.error);
+      }
+    } catch (err) {
+      alert('Update failed');
     } finally {
       setLoading(false);
     }
@@ -467,6 +495,16 @@ export default function App() {
                             title={client.status === 'active' ? 'Suspender Acceso' : 'Activar Acceso'}
                           >
                             {client.status === 'active' ? <ShieldOff size={16} /> : <Shield size={16} />}
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setSelectedClient(client);
+                              setShowEditModal(true);
+                            }}
+                            className="p-2 transition-all border border-transparent hover:border-[#2a2c31] hover:text-[#ff7800]"
+                            title="Cambiar Velocidad"
+                          >
+                            <Edit2 size={16} />
                           </button>
                           <button 
                             onClick={() => handleDeleteClient(client.id, client.name)}
@@ -731,6 +769,59 @@ export default function App() {
                 <div className="pt-6">
                   <button type="submit" className="w-full bg-[#ff7800] hover:bg-[#ff8c24] text-black font-bold py-4 text-[11px] uppercase tracking-widest transition-all">
                     Ejecutar Provisionamiento
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Client Plan Modal */}
+      <AnimatePresence>
+        {showEditModal && selectedClient && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowEditModal(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative bg-[#181b1e] border border-[#2a2c31] w-full max-w-md overflow-hidden shadow-2xl">
+              <div className="bg-[#ff7800] p-4 flex justify-between items-center text-black">
+                <h2 className="font-bold uppercase text-xs">Cambiar Plan / Velocidad</h2>
+                <button onClick={() => setShowEditModal(false)} className="hover:rotate-90 transition-transform"><Plus className="rotate-45" /></button>
+              </div>
+              
+              <form onSubmit={handleUpdatePlan} className="p-8 space-y-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-[#222529] border border-[#2a2c31]">
+                    <p className="text-[10px] text-[#8e8e8e] uppercase font-bold tracking-widest">Cliente</p>
+                    <p className="text-sm font-bold text-white mt-1">{selectedClient.name}</p>
+                    <p className="text-[10px] text-[#56d64d] font-mono mt-1">{selectedClient.ip}</p>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] uppercase font-bold text-[#8e8e8e]">Seleccionar Nuevo Plan</label>
+                    <select 
+                      className="bg-[#0b0c10] border border-[#2a2c31] p-3 outline-none font-mono text-xs focus:border-[#ff7800] text-white"
+                      value={selectedClient.plan_id}
+                      onChange={e => setSelectedClient({ ...selectedClient, plan_id: e.target.value })}
+                    >
+                      {plans.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} (↑{p.upload_limit} ↓{p.download_limit})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    type="button" onClick={() => setShowEditModal(false)}
+                    className="flex-1 bg-transparent border border-[#2a2c31] text-[#8e8e8e] font-bold py-3 text-xs uppercase tracking-widest hover:bg-[#222529] transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 bg-[#ff7800] hover:bg-[#ff8c24] text-black font-bold py-3 text-xs uppercase tracking-widest transition-all"
+                  >
+                    Actualizar
                   </button>
                 </div>
               </form>

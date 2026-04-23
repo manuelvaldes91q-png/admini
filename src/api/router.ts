@@ -184,6 +184,28 @@ router.patch('/clients/:id/status', authenticate, async (req, res) => {
   }
 });
 
+router.patch('/clients/:id/plan', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { plan_id } = req.body;
+  
+  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(id) as any;
+  const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(plan_id) as any;
+  
+  if (!client || !plan) return res.status(404).json({ error: 'Client or Plan not found' });
+
+  try {
+    // Update speed on MikroTik (Queue)
+    await updateClientSpeed(client.name, client.ip, plan.upload_limit, plan.download_limit);
+    
+    // Update in local database
+    db.prepare('UPDATE clients SET plan_id = ? WHERE id = ?').run(plan_id, id);
+    
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/clients/:id', authenticate, async (req, res) => {
   const { id } = req.params;
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(id) as any;
