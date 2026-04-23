@@ -92,7 +92,7 @@ router.post('/test-connection', authenticate, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: err.message,
-      tip: 'Verifica que el servicio API (puerto 8728) esté habilitado en /ip service.'
+      tip: 'Verifica que el servicio API esté habilitado en /ip service y que el puerto coincida con el configurado.'
     });
   }
 });
