@@ -100,47 +100,40 @@ router.post('/test-connection', authenticate, async (req, res) => {
 // Clients (Protected)
 router.get('/clients', authenticate, async (req, res) => {
   try {
-    // RECONCILE START: Automatic intelligent sync with MikroTik
+    // RECONCILE START: Automatic intelligent discovery
     const mtData = await getSyncData();
     const { leases, arp, queues } = mtData;
 
-    // Use Queues as the primary list of active managed clients
+    // 1. Process DHCP Leases (Discovery)
+    for (const lease of leases) {
+      const ip = lease.address;
+      const mac = lease['mac-address'];
+      const hostName = lease['host-name'] || lease.comment || 'Dispositivo Descubierto';
+      
+      const existing = db.prepare('SELECT id FROM clients WHERE mac = ? OR ip = ?').get(mac, ip) as any;
+      if (!existing) {
+        db.prepare('INSERT INTO clients (id, name, mac, ip, plan_id, status, total_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run('disc_' + Math.random().toString(36).substr(2, 6), hostName, mac, ip, '1', 'inactive', '0');
+      }
+    }
+
+    // 2. Sync existing Queues status
     for (const q of queues) {
       const name = q.name;
       const ip = q.target.split('/')[0];
       const maxLimit = q['max-limit'];
       const [up, down] = maxLimit.split('/');
       
-      const lease = leases.find((l: any) => l.address === ip);
-      const mac = lease ? lease['mac-address'] : (arp.find((a: any) => a.address === ip)?.['mac-address'] || '00:00:00:00:00:00');
-      
       const arpEntry = arp.find((a: any) => a.address === ip);
       const isEnabled = arpEntry ? arpEntry.disabled === 'false' : true;
       const currentStatus = isEnabled ? 'active' : 'inactive';
       
-      // Traffic consumption from Queue stats
-      const bytes = q.bytes || '0/0'; // "up/down" in bytes
+      const bytes = q.bytes || '0/0';
       const [upBytes, downBytes] = bytes.split('/');
       const totalBytes = (parseInt(upBytes) + parseInt(downBytes)).toString();
 
-      const existingSource = db.prepare('SELECT id, plan_id FROM clients WHERE name = ? OR ip = ?').get(name, ip) as any;
-
-      // Find or create plan based on speed
-      let plan = db.prepare('SELECT id FROM plans WHERE download_limit = ? AND upload_limit = ?').get(down, up) as any;
-      if (!plan) {
-        const planId = 'p_' + Math.random().toString(36).substr(2, 6);
-        db.prepare('INSERT INTO plans (id, name, download_limit, upload_limit) VALUES (?, ?, ?, ?)')
-          .run(planId, `Plan ${down}`, down, up);
-        plan = { id: planId };
-      }
-
-      if (existingSource) {
-        db.prepare('UPDATE clients SET status = ?, plan_id = ?, mac = ?, total_bytes = ? WHERE id = ?')
-          .run(currentStatus, plan.id, mac, totalBytes, existingSource.id);
-      } else {
-        db.prepare('INSERT INTO clients (id, name, mac, ip, plan_id, status, total_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .run('mt_' + Math.random().toString(36).substr(2, 6), name, mac, ip, plan.id, currentStatus, totalBytes);
-      }
+      db.prepare('UPDATE clients SET status = ?, total_bytes = ? WHERE name = ? OR ip = ?')
+        .run(currentStatus, totalBytes, name, ip);
     }
   } catch (syncErr) {
     console.error('Auto-sync failed (router may be offline):', syncErr);
@@ -185,6 +178,25 @@ router.patch('/clients/:id/status', authenticate, async (req, res) => {
   try {
     await setClientStatus(client.ip, status === 'active');
     db.prepare('UPDATE clients SET status = ? WHERE id = ?').run(status, id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/clients/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(id) as any;
+  
+  if (!client) return res.status(404).json({ error: 'Client not found' });
+
+  try {
+    // Attempt to remove from MikroTik (Queues, ARP, Leases)
+    await removeClient(client.name, client.ip, client.mac);
+    
+    // Remove from local database
+    db.prepare('DELETE FROM clients WHERE id = ?').run(id);
+    
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

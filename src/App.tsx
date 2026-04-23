@@ -16,7 +16,8 @@ import {
   AlertCircle,
   Lock,
   LogOut,
-  User
+  User,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -218,6 +219,25 @@ export default function App() {
       }
     } catch (err: any) {
       alert('Error de red: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteClient = async (id: string, name: string) => {
+    if (!confirm(`¿Estás seguro de eliminar a ${name}? Esto borrará sus registros en MikroTik (Queue, ARP y Lease).`)) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const data = await res.json();
+        alert('Error: ' + data.error);
+      }
+    } catch (err) {
+      alert('Delete failed');
     } finally {
       setLoading(false);
     }
@@ -444,8 +464,16 @@ export default function App() {
                             className={`p-2 transition-all border border-transparent hover:border-[#2a2c31] ${
                               client.status === 'active' ? 'hover:text-red-500' : 'hover:text-[#56d64d]'
                             }`}
+                            title={client.status === 'active' ? 'Suspender Acceso' : 'Activar Acceso'}
                           >
                             {client.status === 'active' ? <ShieldOff size={16} /> : <Shield size={16} />}
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteClient(client.id, client.name)}
+                            className="p-2 transition-all border border-transparent hover:border-[#2a2c31] hover:text-red-600"
+                            title="Eliminar Cliente"
+                          >
+                            <Trash2 size={16} />
                           </button>
                         </td>
                       </tr>

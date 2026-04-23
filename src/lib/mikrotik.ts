@@ -149,6 +149,38 @@ export async function updateClientSpeed(name: string, ip: string, upload: string
   }
 }
 
+export async function removeClient(name: string, ip: string, mac: string) {
+  const client = await connectMT();
+  try {
+    await client.connect();
+
+    // 1. Remove Simple Queue
+    const queueList = await client.write('/queue/simple/print', [`?name=${name}`]);
+    if (queueList.length > 0) {
+      await client.write('/queue/simple/remove', [`=.id=${queueList[0]['.id']}`]);
+    }
+
+    // 2. Remove ARP entry
+    const arpList = await client.write('/ip/arp/print', [`?address=${ip}`]);
+    if (arpList.length > 0) {
+      await client.write('/ip/arp/remove', [`=.id=${arpList[0]['.id']}`]);
+    }
+
+    // 3. Remove DHCP Lease
+    const leaseList = await client.write('/ip/dhcp-server/lease/print', [`?mac-address=${mac}`]);
+    if (leaseList.length > 0) {
+      await client.write('/ip/dhcp-server/lease/remove', [`=.id=${leaseList[0]['.id']}`]);
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to remove client from MikroTik:', err);
+    throw err;
+  } finally {
+    client.close();
+  }
+}
+
 export async function getSyncData() {
   const client = await connectMT();
   try {
