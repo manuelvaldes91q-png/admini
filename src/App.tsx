@@ -18,7 +18,8 @@ import {
   LogOut,
   User,
   Trash2,
-  Edit2
+  Edit2,
+  ArrowDownNarrowWide
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -59,6 +60,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [syncData, setSyncData] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortByConsumption, setSortByConsumption] = useState<boolean>(false);
 
   // Form states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -271,11 +273,18 @@ export default function App() {
     }
   };
 
-  const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.ip.includes(searchTerm) || 
-    c.mac.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredClients = clients
+    .filter(c => 
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      c.ip.includes(searchTerm) || 
+      c.mac.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortByConsumption) {
+        return parseInt(b.total_bytes || '0') - parseInt(a.total_bytes || '0');
+      }
+      return 0;
+    });
 
   const formatBytes = (bytes: string) => {
     const b = parseInt(bytes || '0');
@@ -452,7 +461,15 @@ export default function App() {
                       <th className="p-4">Identificación</th>
                       <th className="p-4">MAC / IP</th>
                       <th className="p-4">Plan Actual</th>
-                      <th className="p-4">Consumo Total</th>
+                      <th 
+                        className="p-4 cursor-pointer hover:text-[#ff7800] transition-colors"
+                        onClick={() => setSortByConsumption(!sortByConsumption)}
+                      >
+                        <div className="flex items-center gap-2">
+                          Consumo Total
+                          <ArrowDownNarrowWide size={14} className={sortByConsumption ? 'text-[#ff7800]' : 'text-[#444]'} />
+                        </div>
+                      </th>
                       <th className="p-4">Estado Red</th>
                       <th className="p-4 text-right">Controles</th>
                     </tr>
