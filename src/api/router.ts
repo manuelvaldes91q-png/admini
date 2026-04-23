@@ -62,13 +62,14 @@ router.get('/settings', authenticate, (req, res) => {
 });
 
 router.post('/settings', authenticate, (req, res) => {
-  const { mt_host, mt_port, mt_user, mt_pass, mt_interface, tg_token, admin_user, admin_pass } = req.body;
+  const { mt_host, mt_port, mt_user, mt_pass, mt_interface, tg_token, tg_chat_id, admin_user, admin_pass } = req.body;
   
   if (mt_host !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(mt_host, 'mt_host');
   if (mt_port !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(mt_port, 'mt_port');
   if (mt_user !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(mt_user, 'mt_user');
   if (mt_pass !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(mt_pass, 'mt_pass');
   if (mt_interface !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(mt_interface, 'mt_interface');
+  if (tg_chat_id !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(tg_chat_id, 'tg_chat_id');
   if (admin_user !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(admin_user, 'admin_user');
   if (admin_pass !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(admin_pass, 'admin_pass');
   
@@ -78,6 +79,24 @@ router.post('/settings', authenticate, (req, res) => {
   }
   
   res.json({ success: true });
+});
+
+router.post('/test-telegram', authenticate, async (req, res) => {
+  const token = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_token') as any;
+  const chatId = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any;
+
+  if (!token?.value || !chatId?.value) {
+    return res.status(400).json({ error: 'Token o Chat ID no configurados' });
+  }
+
+  try {
+    const { Telegraf } = await import('telegraf');
+    const testBot = new Telegraf(token.value);
+    await testBot.telegram.sendMessage(chatId.value, '🔔 Prueba de conexión desde MikroTik Dashboard. ¡Tu bot esta funcionando!');
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/test-connection', authenticate, async (req, res) => {

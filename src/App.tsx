@@ -240,6 +240,23 @@ export default function App() {
     }
   };
 
+  const handleTestTelegram = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/test-telegram', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert('TELEGRAM: Mensaje de prueba enviado exitosamente.');
+      } else {
+        alert('ERROR TELEGRAM: ' + data.error);
+      }
+    } catch (err: any) {
+      alert('Error de red: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteClient = async (id: string, name: string) => {
     if (!confirm(`¿Estás seguro de eliminar a ${name}? Esto borrará sus registros en MikroTik (Queue, ARP y Lease).`)) return;
     
@@ -716,82 +733,122 @@ export default function App() {
         )}
 
         {activeTab === 'settings' && (
-          <motion.div initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} className="max-w-3xl mx-auto space-y-6 pb-12">
+          <motion.div initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} className="max-w-4xl mx-auto space-y-6 pb-12">
+            
+            {/* MikroTik Connection */}
             <div className="bg-[#181b1e] border border-[#2a2c31]">
-              <div className="p-4 border-b border-[#2a2c31] bg-[#222529]">
-                <h3 className="text-xs font-bold uppercase flex items-center gap-2">Configuración General</h3>
+              <div className="p-4 border-b border-[#2a2c31] bg-[#222529] flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase flex items-center gap-2">
+                  <Server size={14} className="text-[#ff7800]" /> Conexión MikroTik
+                </h3>
+                <button 
+                  onClick={handleTestConnection}
+                  className="bg-[#2a2c31] hover:bg-[#3a3f4b] text-white font-bold py-2 px-4 text-[10px] uppercase tracking-widest border border-[#3a3f4b] transition-all flex items-center gap-2"
+                >
+                  <Activity size={12} className="text-[#ff7800]" />
+                  Probar Conexión
+                </button>
               </div>
-              <div className="p-6 space-y-6">
+              <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
-                    { label: 'MikroTik Host / Domain', key: 'mt_host' },
-                    { label: 'Port API', key: 'mt_port' },
-                    { label: 'API User', key: 'mt_user' },
-                    { label: 'API Password', key: 'mt_pass', type: 'password' },
-                    { label: 'Interfaz ARP (BINDING)', key: 'mt_interface' },
+                    { label: 'IP / Dominio del Router', key: 'mt_host' },
+                    { label: 'Puerto API (Default 8728)', key: 'mt_port' },
+                    { label: 'Usuario MikroTik', key: 'mt_user' },
+                    { label: 'Contraseña MikroTik', key: 'mt_pass', type: 'password' },
+                    { label: 'Interfaz (Bridge/Ether)', key: 'mt_interface' },
                   ].map(f => (
                     <div key={f.key} className="flex flex-col gap-2">
                        <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">{f.label}</label>
                        <input 
                           type={f.type || 'text'}
-                          className="bg-[#0b0c10] border border-[#2a2c31] p-2.5 outline-none font-mono text-xs focus:border-[#ff7800] text-[#56d64d] transition-all"
+                          className="bg-[#0b0c10] border border-[#2a2c31] p-3 outline-none font-mono text-xs focus:border-[#ff7800] text-[#56d64d] transition-all"
                           value={config[f.key] || ''}
                           onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })}
                        />
                     </div>
                   ))}
                 </div>
-                
-                <div className="pt-6 border-t border-[#2a2c31]">
-                  <h4 className="text-[10px] uppercase font-bold text-[#ff7800] mb-4 tracking-widest">Credenciales del Panel</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Usuario Administrador</label>
-                      <input 
-                        type="text"
-                        className="bg-[#0b0c10] border border-[#2a2c31] p-2.5 outline-none font-mono text-xs focus:border-[#ff7800] text-white"
-                        value={config.admin_user || ''}
-                        onChange={(e) => setConfig({ ...config, admin_user: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Nueva Contraseña</label>
-                      <input 
-                        type="password"
-                        className="bg-[#0b0c10] border border-[#2a2c31] p-2.5 outline-none font-mono text-xs focus:border-[#ff7800] text-white"
-                        value={config.admin_pass || ''}
-                        onChange={(e) => setConfig({ ...config, admin_pass: e.target.value })}
-                      />
-                    </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Admin Access */}
+              <div className="bg-[#181b1e] border border-[#2a2c31]">
+                <div className="p-4 border-b border-[#2a2c31] bg-[#222529]">
+                  <h3 className="text-xs font-bold uppercase flex items-center gap-2">
+                    <User size={14} className="text-blue-400" /> Acceso Panel
+                  </h3>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Usuario Administrador</label>
+                    <input 
+                      type="text"
+                      className="bg-[#0b0c10] border border-[#2a2c31] p-3 outline-none font-mono text-xs focus:border-[#ff7800] text-white"
+                      value={config.admin_user || ''}
+                      onChange={(e) => setConfig({ ...config, admin_user: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Nueva Contraseña</label>
+                    <input 
+                      type="password"
+                      className="bg-[#0b0c10] border border-[#2a2c31] p-3 outline-none font-mono text-xs focus:border-[#ff7800] text-white"
+                      value={config.admin_pass || ''}
+                      placeholder="Cambiar contraseña..."
+                      onChange={(e) => setConfig({ ...config, admin_pass: e.target.value })}
+                    />
                   </div>
                 </div>
+              </div>
 
-                <div className="flex flex-col gap-2 pt-4 border-t border-[#2a2c31]">
-                  <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Telegram Bot Token</label>
-                  <input 
-                    type="password"
-                    className="bg-[#0b0c10] border border-[#2a2c31] p-2.5 outline-none font-mono text-xs focus:border-[#ff7800] text-[#ff7800] transition-all"
-                    placeholder="Provide token from @BotFather"
-                    value={config.tg_token || ''}
-                    onChange={(e) => setConfig({ ...config, tg_token: e.target.value })}
-                  />
+              {/* Telegram Bot */}
+              <div className="bg-[#181b1e] border border-[#2a2c31]">
+                <div className="p-4 border-b border-[#2a2c31] bg-[#222529] flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase flex items-center gap-2">
+                    <MessageSquare size={14} className="text-[#0088cc]" /> Notificaciones
+                  </h3>
+                  <button 
+                    onClick={handleTestTelegram}
+                    className="bg-[#2a2c31] hover:bg-[#3a3f4b] text-[#0088cc] font-black py-2 px-4 text-[10px] uppercase tracking-widest border border-[#3a3f4b] transition-all flex items-center gap-2"
+                  >
+                    <Zap size={12} />
+                    Test Bot
+                  </button>
                 </div>
-                <div className="flex flex-col md:flex-row gap-4">
-                  <button 
-                    onClick={updateSettings}
-                    className="flex-1 bg-[#ff7800] hover:bg-[#ff8c24] text-black font-bold py-3 text-xs uppercase tracking-widest transition-all"
-                  >
-                    Confirmar y Guardar Cambios
-                  </button>
-                  <button 
-                    onClick={handleTestConnection}
-                    className="bg-[#2a2c31] hover:bg-[#3a3f4b] text-white font-bold py-3 px-6 text-xs uppercase tracking-widest border border-[#3a3f4b] transition-all flex items-center justify-center gap-2"
-                  >
-                    <Activity size={14} className="text-[#ff7800]" />
-                    Probar Conexión
-                  </button>
+                <div className="p-6 space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Bot Token (@BotFather)</label>
+                    <input 
+                      type="password"
+                      className="bg-[#0b0c10] border border-[#2a2c31] p-3 outline-none font-mono text-xs focus:border-[#ff7800] text-[#0088cc]"
+                      value={config.tg_token || ''}
+                      onChange={(e) => setConfig({ ...config, tg_token: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Chat ID (Para alertas)</label>
+                    <input 
+                      type="text"
+                      className="bg-[#0b0c10] border border-[#2a2c31] p-3 outline-none font-mono text-xs focus:border-[#ff7800] text-white"
+                      value={config.tg_chat_id || ''}
+                      placeholder="Ej: 12345678"
+                      onChange={(e) => setConfig({ ...config, tg_chat_id: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <div className="pt-4">
+              <button 
+                onClick={updateSettings}
+                className="w-full bg-[#ff7800] hover:bg-[#ff8c24] text-black font-black py-4 text-[11px] uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
+              >
+                <Save size={16} />
+                Guardar Toda la Configuración
+              </button>
             </div>
           </motion.div>
         )}

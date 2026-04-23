@@ -37,6 +37,7 @@ export function initDB() {
     INSERT OR IGNORE INTO settings (key, value) VALUES ('mt_pass', '');
     INSERT OR IGNORE INTO settings (key, value) VALUES ('mt_interface', 'SALIDA');
     INSERT OR IGNORE INTO settings (key, value) VALUES ('tg_token', '');
+    INSERT OR IGNORE INTO settings (key, value) VALUES ('tg_chat_id', '');
     INSERT OR IGNORE INTO settings (key, value) VALUES ('admin_user', 'admin');
     INSERT OR IGNORE INTO settings (key, value) VALUES ('admin_pass', 'admin123');
   `);
