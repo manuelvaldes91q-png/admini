@@ -15,7 +15,32 @@ export function initBot() {
 
   bot = new Telegraf(token.value);
 
-  bot.start((ctx) => ctx.reply('🚀 Mikrotik ISP Manager Bot Online.\nUsa /help para ver los comandos disponibles.'));
+  // Auth Middleware: Only allow configured Chat IDs
+  bot.use(async (ctx, next) => {
+    const chatIds = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any)?.value || '';
+    const allowedIds = chatIds.split(',').map((id: string) => id.trim());
+    
+    if (ctx.from && allowedIds.includes(ctx.from.id.toString())) {
+      return next();
+    }
+    
+    if (ctx.chat?.type === 'private') {
+      ctx.reply(`🚫 No tienes acceso a este sistema.\nTu ID de Telegram es: \`${ctx.from?.id}\`\nAgrégalo en el panel web para autorizarte.`, { parse_mode: 'Markdown' });
+    }
+  });
+
+  const mainKeyboard = Markup.keyboard([
+    ['📊 Status', '🔍 Descubrir'],
+    ['👥 Clientes', '⚡ Planes']
+  ]).resize();
+
+  bot.start((ctx) => ctx.reply('🚀 Mikrotik ISP Manager Bot Online.', mainKeyboard));
+
+  // Handle Menu Buttons
+  bot.hears('📊 Status', (ctx) => (bot as any).handleCommand('/status', ctx));
+  bot.hears('🔍 Descubrir', (ctx) => (bot as any).handleCommand('/descubrir', ctx));
+  bot.hears('👥 Clientes', (ctx) => (bot as any).handleCommand('/clientes', ctx));
+  bot.hears('⚡ Planes', (ctx) => (bot as any).handleCommand('/planes', ctx));
 
   bot.command('help', (ctx) => {
     ctx.reply(

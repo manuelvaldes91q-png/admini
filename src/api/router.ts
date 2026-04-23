@@ -92,8 +92,17 @@ router.post('/test-telegram', authenticate, async (req, res) => {
   try {
     const { Telegraf } = await import('telegraf');
     const testBot = new Telegraf(token.value);
-    await testBot.telegram.sendMessage(chatId.value, '🔔 Prueba de conexión desde MikroTik Dashboard. ¡Tu bot esta funcionando!');
-    res.json({ success: true });
+    const ids = chatId.value.split(',').map((id: string) => id.trim());
+    
+    let sentCount = 0;
+    for (const id of ids) {
+      if (id) {
+        await testBot.telegram.sendMessage(id, '🔔 Prueba de conexión desde MikroTik Dashboard. ¡Tu bot esta funcionando!');
+        sentCount++;
+      }
+    }
+    
+    res.json({ success: true, message: `Mensaje enviado a ${sentCount} ID(s)` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

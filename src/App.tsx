@@ -828,14 +828,15 @@ export default function App() {
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Chat ID (Para alertas)</label>
+                    <label className="text-[10px] uppercase font-bold text-[#8e8e8e]">Chat IDs (Separados por comas)</label>
                     <input 
                       type="text"
                       className="bg-[#0b0c10] border border-[#2a2c31] p-3 outline-none font-mono text-xs focus:border-[#ff7800] text-white"
                       value={config.tg_chat_id || ''}
-                      placeholder="Ej: 12345678"
+                      placeholder="Ej: 123456, 789012"
                       onChange={(e) => setConfig({ ...config, tg_chat_id: e.target.value })}
                     />
+                    <p className="text-[8px] text-[#444] uppercase">Solo estos IDs podrán usar el bot por seguridad.</p>
                   </div>
                 </div>
               </div>
