@@ -386,41 +386,50 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0b0c10] text-[#d8d9da] font-sans selection:bg-[#ff7800]/30">
       {/* Top Navbar */}
-      <header className="bg-[#181b1e] border-b border-[#2a2c31] px-6 py-3 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <div className="bg-[#ff7800] p-1.5 rounded-sm">
-            <Activity size={20} className="text-black" />
+      <header className="bg-[#181b1e] border-b border-[#2a2c31] px-4 md:px-6 py-3 flex flex-col md:flex-row justify-between items-center sticky top-0 z-50 gap-4 md:gap-0">
+        <div className="flex items-center justify-between w-full md:w-auto">
+          <div className="flex items-center gap-4">
+            <div className="bg-[#ff7800] p-1.5 rounded-sm">
+              <Activity size={20} className="text-black" />
+            </div>
+            <div>
+              <h1 className="font-bold text-sm tracking-wide text-white uppercase">MikroTik <span className="text-[#ff7800] ml-2">ISP MASTER</span></h1>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-sm tracking-wide text-white uppercase">MikroTik Dashboard <span className="text-[#ff7800] ml-2">ISP MASTER</span></h1>
-          </div>
+          <button 
+            onClick={handleLogout}
+            className="md:hidden flex items-center gap-2 text-[10px] font-bold uppercase text-red-500 bg-red-500/10 px-3 py-1 rounded transition-all"
+          >
+            <LogOut size={14} />
+          </button>
         </div>
         
-        <div className="flex items-center gap-6">
-          <nav className="flex gap-1 text-[11px] font-medium uppercase">
+        <div className="flex items-center justify-center w-full md:w-auto gap-4 md:gap-6 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+          <nav className="flex gap-1 text-[11px] font-medium uppercase whitespace-nowrap">
             {[
               { id: 'clients', label: 'Dashboard', icon: Activity },
-              { id: 'sync', label: 'Monitor Real-Time', icon: RefreshCw },
-              { id: 'settings', label: 'Configuración', icon: SettingsIcon },
+              { id: 'sync', label: 'Monitor', icon: RefreshCw },
+              { id: 'settings', label: 'Config', icon: SettingsIcon },
             ].map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 transition-all ${
+                className={`flex items-center gap-2 px-3 md:px-4 py-2 transition-all ${
                   activeTab === item.id 
                     ? 'text-[#ff7800] border-b-2 border-[#ff7800] bg-[#222529]' 
                     : 'text-[#8e8e8e] hover:text-white hover:bg-[#222529]'
                 }`}
               >
                 <item.icon size={14} />
-                {item.label}
+                <span className="hidden sm:inline">{item.label}</span>
+                <span className="sm:hidden">{item.label.split(' ')[0]}</span>
               </button>
             ))}
           </nav>
 
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-2 text-[10px] font-bold uppercase text-red-500 hover:bg-red-500/10 px-3 py-1 rounded transition-all"
+            className="hidden md:flex items-center gap-2 text-[10px] font-bold uppercase text-red-500 hover:bg-red-500/10 px-3 py-1 rounded transition-all"
           >
             <LogOut size={14} />
             Salir
@@ -428,23 +437,24 @@ export default function App() {
         </div>
       </header>
 
-      <main className="p-6 max-w-[1600px] mx-auto">
+      <main className="p-4 md:p-6 max-w-[1600px] mx-auto">
         {activeTab === 'clients' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               {[
-                { label: 'Total Clientes', val: clients.length, icon: Users, col: 'text-blue-400' },
+                { label: 'Total', val: clients.length, icon: Users, col: 'text-blue-400' },
                 { label: 'Activos', val: clients.filter(c => c.status === 'active').length, icon: Shield, col: 'text-green-400' },
                 { label: 'Cortados', val: clients.filter(c => c.status === 'inactive').length, icon: ShieldOff, col: 'text-red-400' },
-                { label: 'Planes Config', val: plans.length, icon: Zap, col: 'text-orange-400' },
+                { label: 'Planes', val: plans.length, icon: Zap, col: 'text-orange-400' },
               ].map((stat, i) => (
-                <div key={i} className="bg-[#181b1e] border border-[#2a2c31] p-4 flex items-center justify-between">
+                <div key={i} className="bg-[#181b1e] border border-[#2a2c31] p-3 md:p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-[#8e8e8e] uppercase font-bold tracking-widest">{stat.label}</p>
-                    <p className={`text-2xl font-mono font-bold mt-1 ${stat.col}`}>{stat.val}</p>
+                    <p className="text-[8px] md:text-[10px] text-[#8e8e8e] uppercase font-bold tracking-widest">{stat.label}</p>
+                    <p className={`text-lg md:text-2xl font-mono font-bold mt-1 ${stat.col}`}>{stat.val}</p>
                   </div>
-                  <stat.icon className="opacity-20" size={32} />
+                  <stat.icon className="opacity-20 hidden md:block" size={32} />
+                  <stat.icon className="opacity-20 md:hidden" size={20} />
                 </div>
               ))}
             </div>
@@ -484,24 +494,24 @@ export default function App() {
 
             {/* Clients Panel */}
             <div className="bg-[#181b1e] border border-[#2a2c31]">
-              <div className="p-4 border-b border-[#2a2c31] flex justify-between items-center bg-[#222529]">
+              <div className="p-4 border-b border-[#2a2c31] flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#222529] gap-4">
                 <h3 className="text-xs font-bold uppercase flex items-center gap-2">
                   <Users size={14} className="text-[#ff7800]" /> Lista de Gestión
                 </h3>
-                <div className="flex gap-3">
-                  <div className="relative flex items-center bg-[#0b0c10] border border-[#2a2c31] px-3 py-1.5 focus-within:border-[#ff7800] transition-all">
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <div className="relative flex items-center bg-[#0b0c10] border border-[#2a2c31] px-3 py-1.5 focus-within:border-[#ff7800] transition-all w-full sm:w-48">
                     <Search size={14} className="text-[#8e8e8e]" />
                     <input 
                       type="text" 
                       placeholder="Filtrar..."
-                      className="bg-transparent border-none outline-none text-xs ml-2 w-48 text-white"
+                      className="bg-transparent border-none outline-none text-xs ml-2 w-full text-white"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
                   <button 
                     onClick={() => setShowAddModal(true)}
-                    className="bg-[#ff7800] hover:bg-[#ff8c24] text-black font-bold text-[10px] uppercase px-4 py-2 transition-all flex items-center gap-2"
+                    className="bg-[#ff7800] hover:bg-[#ff8c24] text-black font-bold text-[10px] uppercase px-4 py-2.5 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
                   >
                     <Plus size={14} /> Registrar Cliente
                   </button>
