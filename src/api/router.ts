@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import db from '../lib/db.js';
-import { provisionClient, setClientStatus, updateClientSpeed, getSyncData } from '../lib/mikrotik.js';
+import { provisionClient, setClientStatus, updateClientSpeed, getSyncData, removeClient } from '../lib/mikrotik.js';
 import { restartBot } from '../lib/bot.js';
 import jwt from 'jsonwebtoken';
 
