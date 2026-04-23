@@ -297,6 +297,16 @@ export default function App() {
       return 0;
     });
 
+  const formatSpeed = (speed: string) => {
+    let s = parseInt(speed || '0');
+    if (isNaN(s)) return speed; // Return as is if already has units like '5M'
+    if (s === 0) return 'Ilimitado';
+    
+    if (s >= 1000000) return (s / 1000000).toFixed(0) + ' Mbps';
+    if (s >= 1000) return (s / 1000).toFixed(0) + ' Kbps';
+    return s + ' bps';
+  };
+
   const formatBytes = (bytes: string) => {
     const b = parseInt(bytes || '0');
     if (b === 0) return '0 B';
@@ -531,7 +541,7 @@ export default function App() {
                         </td>
                         <td className="p-4">
                           <div className="font-bold">{client.plan_name}</div>
-                          <div className="text-[10px] text-[#8e8e8e]">↑{client.upload_limit} ↓{client.download_limit}</div>
+                          <div className="text-[10px] text-[#8e8e8e]">↑{formatSpeed(client.upload_limit)} ↓{formatSpeed(client.download_limit)}</div>
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
@@ -822,7 +832,7 @@ export default function App() {
                       className="bg-[#0b0c10] border border-[#2a2c31] p-2.5 outline-none font-mono text-xs cursor-pointer focus:border-[#ff7800]"
                       value={newClient.plan_id} onChange={e => setNewClient({ ...newClient, plan_id: e.target.value })}
                     >
-                      {plans.map(p => <option key={p.id} value={p.id}>{p.name} (↓{p.download_limit} ↑{p.upload_limit})</option>)}
+                      {plans.map(p => <option key={p.id} value={p.id}>{p.name} (↓{formatSpeed(p.download_limit)} ↑{formatSpeed(p.upload_limit)})</option>)}
                     </select>
                   </div>
                 </div>
@@ -865,7 +875,7 @@ export default function App() {
                       onChange={e => setSelectedClient({ ...selectedClient, plan_id: e.target.value })}
                     >
                       {plans.map(p => (
-                        <option key={p.id} value={p.id}>{p.name} (↑{p.upload_limit} ↓{p.download_limit})</option>
+                        <option key={p.id} value={p.id}>{p.name} (↑{formatSpeed(p.upload_limit)} ↓{formatSpeed(p.download_limit)})</option>
                       ))}
                     </select>
                   </div>
