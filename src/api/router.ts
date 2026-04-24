@@ -131,9 +131,48 @@ router.post('/test-connection', authenticate, async (req, res) => {
 router.get('/clients', authenticate, async (req, res) => {
   try {
     const mtData = await getSyncData();
-    const { arp, queues } = mtData;
+    const { arp, queues, leases } = mtData;
 
-    // Sync existing Queues status
+    // --- LÓGICA INTELIGENTE DE AUTO-IMPORTACIÓN ---
+    // 1. Filtrar Leases Estáticos con Comentarios (Clientes reales en MikroTik)
+    const staticLeases = leases.filter((l: any) => l.dynamic === 'false' && l.comment);
+    
+    for (const l of staticLeases) {
+      const mac = l['mac-address'];
+      const ip = l.address;
+      const name = l.comment;
+
+      // Buscar si ya existe en la DB
+      const existing = db.prepare('SELECT id FROM clients WHERE mac = ?').get(mac) as any;
+      
+      if (!existing) {
+        // Buscar velocidad en Queues para asignar plan correcto
+        const queue = queues.find((q: any) => q.target.split('/')[0] === ip || q.name === name);
+        let planId = '1'; // Plan por defecto (Básico)
+
+        if (queue) {
+          const maxLimit = queue['max-limit'] || '0/0';
+          const [up, down] = maxLimit.split('/');
+          
+          // Buscar plan que coincida con esta velocidad
+          let plan = db.prepare('SELECT id FROM plans WHERE download_limit = ? AND upload_limit = ?').get(down, up) as any;
+          if (!plan) {
+            // Crear el plan si no existe
+            planId = 'plan_' + Date.now() + Math.random().toString(36).substring(2, 5);
+            db.prepare('INSERT INTO plans (id, name, download_limit, upload_limit) VALUES (?, ?, ?, ?)')
+              .run(planId, `Plan ${down}`, down, up);
+          } else {
+            planId = plan.id;
+          }
+        }
+
+        // Auto-registrar cliente detectado
+        db.prepare('INSERT INTO clients (id, name, mac, ip, plan_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+          .run('cl_' + Date.now() + Math.random().toString(36).substring(2, 5), name, mac, ip, planId, 'active');
+      }
+    }
+
+    // --- ACTUALIZACIÓN DE ESTADO EN TIEMPO REAL ---
     for (const q of queues) {
       const name = q.name;
       const ip = q.target.split('/')[0];
@@ -259,42 +298,66 @@ router.post('/import-mikrotik', authenticate, async (req, res) => {
     const data = await getSyncData();
     const { leases, queues } = data;
     
-    // We'll use Static Leases or Queues as the primary source for clients
-    // Usually, comments in MikroTik are the client names
-    const importedCount = { count: 0 };
+    let importedCount = 0;
     
-    // We prioritize Queues since they define the "Plan"
+    // 1. Process Queues (Primary source for speed/plans)
     queues.forEach((q: any) => {
       const name = q.name;
-      const ip = q.target.split('/')[0]; // target can be "192.168.1.1/32"
-      const maxLimit = q['max-limit']; // "1M/5M"
+      const ip = q.target.split('/')[0];
+      const maxLimit = q['max-limit'] || '0/0';
       const [up, down] = maxLimit.split('/');
       
-      // Try to find the MAC from leases
       const lease = leases.find((l: any) => l.address === ip);
       const mac = lease ? lease['mac-address'] : '00:00:00:00:00:00';
 
-      // Check if client already exists in DB
-      const existing = db.prepare('SELECT id FROM clients WHERE name = ? OR ip = ?').get(name, ip);
+      const existingByMac = db.prepare('SELECT id FROM clients WHERE mac = ?').get(mac) as any;
+      const existingByIp = db.prepare('SELECT id FROM clients WHERE ip = ?').get(ip) as any;
+      const existingByName = db.prepare('SELECT id FROM clients WHERE name = ?').get(name) as any;
       
-      if (!existing) {
-        // Find or create a matching plan
+      if (!existingByMac && !existingByIp && !existingByName) {
         let plan = db.prepare('SELECT id FROM plans WHERE download_limit = ? AND upload_limit = ?').get(down, up) as any;
         if (!plan) {
-          const planId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+          const planId = 'plan_' + Date.now() + Math.random().toString(36).substr(2, 4);
           db.prepare('INSERT INTO plans (id, name, download_limit, upload_limit) VALUES (?, ?, ?, ?)')
             .run(planId, `Plan ${down}`, down, up);
           plan = { id: planId };
         }
 
         db.prepare('INSERT INTO clients (id, name, mac, ip, plan_id, status) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(Date.now().toString() + importedCount.count, name, mac, ip, plan.id, 'active');
+          .run('cl_' + Date.now() + importedCount, name, mac, ip, plan.id, 'active');
         
-        importedCount.count++;
+        importedCount++;
       }
     });
 
-    res.json({ success: true, imported: importedCount.count });
+    // 2. Process Static Leases with Comments (Secondary source)
+    leases.filter((l: any) => l.dynamic === 'false' && l.comment).forEach((l: any) => {
+      const name = l.comment;
+      const mac = l['mac-address'];
+      const ip = l.address;
+
+      const existingByMac = db.prepare('SELECT id FROM clients WHERE mac = ?').get(mac) as any;
+      const existingByIp = db.prepare('SELECT id FROM clients WHERE ip = ?').get(ip) as any;
+      
+      if (!existingByMac && !existingByIp) {
+        // Look for a matching queue to get speed, else default to first plan
+        const queue = queues.find((q: any) => q.target.split('/')[0] === ip || q.name === name);
+        let planId = '1'; // Default plan ID if none found
+        
+        if (queue) {
+           const [up, down] = (queue['max-limit'] || '0/0').split('/');
+           const existingPlan = db.prepare('SELECT id FROM plans WHERE download_limit = ? AND upload_limit = ?').get(down, up) as any;
+           if (existingPlan) planId = existingPlan.id;
+        }
+
+        db.prepare('INSERT INTO clients (id, name, mac, ip, plan_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+          .run('cl_' + Date.now() + importedCount, name, mac, ip, planId, 'active');
+        
+        importedCount++;
+      }
+    });
+
+    res.json({ success: true, imported: importedCount });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

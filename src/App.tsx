@@ -498,7 +498,9 @@ export default function App() {
                       <p className="text-[#56d64d] font-mono font-bold text-sm group-hover:text-blue-400">{lease.address}</p>
                       <p className="text-[9px] text-[#8e8e8e] font-mono mt-1 uppercase">{lease['mac-address']}</p>
                       <div className="mt-3 flex justify-between items-center">
-                        <span className="text-[8px] text-[#444] font-bold uppercase truncate max-w-[100px]">{lease['host-name'] || 'Sin nombre'}</span>
+                        <span className="text-[8px] text-[#444] font-bold uppercase truncate max-w-[100px]">
+                          {lease.comment || lease['host-name'] || 'Sin nombre'}
+                        </span>
                         <div className="bg-blue-500 p-1 rounded-sm group-hover:bg-blue-400 transition-colors">
                           <Plus size={10} className="text-black" />
                         </div>
