@@ -239,8 +239,13 @@ export async function initBot() {
     ctx.reply(msg, { parse_mode: 'Markdown' });
   });
 
-  bot.launch();
-  console.log('Telegram bot started with Enhanced Interactive flow.');
+  try {
+    bot.launch();
+    console.log('Telegram bot started with Enhanced Interactive flow.');
+  } catch (err: any) {
+    console.error('CRITICAL: Telegram bot failed to launch. This may be due to a 409 Conflict (bot running elsewhere).');
+    console.error('Error details:', err.message);
+  }
 }
 
 export async function restartBot() {
