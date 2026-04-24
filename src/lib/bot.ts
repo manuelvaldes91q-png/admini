@@ -5,9 +5,14 @@ import { provisionClient, setClientStatus, updateClientSpeed, getSyncData } from
 let bot: Telegraf | null = null;
 
 export async function initBot() {
-  const token = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_token') as any)?.value;
+  let token = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_token') as any)?.value;
   const chatId = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any)?.value;
   
+  // --- OVERRIDE MANUAL (Opcional) ---
+  // Si quieres forzar un token nuevo, descomenta la línea de abajo y pon tu token:
+  // token = 'TU_NUEVO_TOKEN_AQUI';
+  // ----------------------------------
+
   if (!token) {
     console.warn('Telegram token not found in settings. Bot not initialized.');
     return;
@@ -17,7 +22,7 @@ export async function initBot() {
   if (bot) {
     try {
       console.log('Stopping existing Telegram bot instance...');
-      bot.stop('SIGTERM');
+      await bot.stop('SIGTERM');
     } catch (e) {
       console.error('Error stopping bot:', e);
     }
@@ -240,14 +245,29 @@ export async function initBot() {
   });
 
   try {
-    bot.launch();
+    await bot.launch();
     console.log('Telegram bot started with Enhanced Interactive flow.');
   } catch (err: any) {
-    console.error('CRITICAL: Telegram bot failed to launch. This may be due to a 409 Conflict (bot running elsewhere).');
-    console.error('Error details:', err.message);
+    if (err.response?.error_code === 409 || err.message?.includes('409')) {
+      console.error('CRITICAL: Telegram 409 Conflict. Another instance is already running.');
+      console.error('Check your VPS or PM2 processes. Use: pm2 status');
+    } else if (err.code === 'ETIMEDOUT') {
+      console.error('CRITICAL: Connection to Telegram API timed out. Check your internet/DNS.');
+    } else {
+      console.error('Telegram bot failed to launch:', err.message);
+    }
   }
 }
 
 export async function restartBot() {
+  if (bot) {
+    try {
+      await bot.stop('SIGTERM');
+      // Esperar 2 segundos para asegurar que Telegram cierre la sesión anterior
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (e) {
+      console.error('Error stopping bot:', e);
+    }
+  }
   await initBot();
 }
