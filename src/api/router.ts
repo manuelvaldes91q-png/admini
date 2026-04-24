@@ -30,9 +30,10 @@ router.post('/login', (req, res) => {
     const token = jwt.sign({ user: username }, JWT_SECRET, { expiresIn: '24h' });
     res.cookie('auth_token', token, { 
       httpOnly: true, 
-      secure: false, // Changed to false to allow HTTP access on some VPS environments
+      secure: false, 
       maxAge: 24 * 60 * 60 * 1000,
-      sameSite: 'lax'
+      sameSite: 'lax',
+      path: '/'
     });
     return res.json({ success: true });
   }
