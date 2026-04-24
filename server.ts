@@ -12,6 +12,9 @@ dotenv.config();
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+  const isProduction = process.env.NODE_ENV === 'production' || process.argv.includes('--production');
+
+  console.log(`Starting server in ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} mode on port ${PORT}...`);
 
   // Initialize Database
   initDB();
@@ -25,24 +28,30 @@ async function startServer() {
 
   // API Routes
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
+    res.json({ status: 'ok', mode: isProduction ? 'production' : 'development' });
   });
 
   app.use('/api', apiRouter);
 
   // Vite middleware or static serving
-  if (process.env.NODE_ENV !== 'production') {
-    // Dynamic import to avoid loading Vite in production bundle
-    const { createServer } = await import('vite');
-    const vite = await createServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+  if (!isProduction) {
+    try {
+      console.log('Loading Vite middleware...');
+      // Dynamic import to avoid loading Vite in production bundle
+      const { createServer } = await import('vite');
+      const vite = await createServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.error('Failed to load Vite. If this is production, please use NODE_ENV=production or --production flag.');
+      throw e;
+    }
   } else {
     // In production, we serve static files from /dist
-    // Note: __dirname is available in CJS
     const publicPath = path.join(process.cwd(), 'dist');
+    console.log(`Serving static files from: ${publicPath}`);
     app.use(express.static(publicPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(publicPath, 'index.html'));
@@ -50,7 +59,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server successfully running on http://0.0.0.0:${PORT}`);
   });
 }
 
