@@ -4,6 +4,16 @@ import path from 'path';
 const db = new Database('isp_manager.db');
 
 export function initDB() {
+  // Option to reset app via ENV
+  if (process.env.RESET_APP === 'true') {
+    console.log('RESET_APP=true detected. Clearing database...');
+    db.exec(`
+      DROP TABLE IF EXISTS settings;
+      DROP TABLE IF EXISTS clients;
+      DROP TABLE IF EXISTS plans;
+    `);
+  }
+
   // Config table
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
