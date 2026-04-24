@@ -5,13 +5,13 @@ import { provisionClient, setClientStatus, updateClientSpeed, getSyncData } from
 let bot: Telegraf | null = null;
 
 export async function initBot() {
-  let token = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_token') as any)?.value;
-  const chatId = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any)?.value;
+  let token = process.env.TG_TOKEN || (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_token') as any)?.value;
+  const chatId = process.env.TG_CHAT_ID || (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any)?.value;
   
-  // --- OVERRIDE MANUAL (Opcional) ---
-  // Si quieres forzar un token nuevo, descomenta la línea de abajo y pon tu token:
-  // token = 'TU_NUEVO_TOKEN_AQUI';
-  // ----------------------------------
+  // --- OVERRIDE MANUAL ---
+  // If you want to force it directly here:
+  // token = 'YOUR_NEW_TOKEN_HERE';
+  // -------------------------
 
   if (!token) {
     console.warn('Telegram token not found in settings. Bot not initialized.');
