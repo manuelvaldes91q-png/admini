@@ -1,18 +1,13 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { initDB } from './src/lib/db.js';
 import apiRouter from './src/api/router.js';
 import { initBot } from './src/lib/bot.js';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
@@ -35,18 +30,22 @@ async function startServer() {
 
   app.use('/api', apiRouter);
 
-  // Vite middleware for development
+  // Vite middleware or static serving
   if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
+    // Dynamic import to avoid loading Vite in production bundle
+    const { createServer } = await import('vite');
+    const vite = await createServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    // In production, we serve static files from /dist
+    // Note: __dirname is available in CJS
+    const publicPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(publicPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.sendFile(path.join(publicPath, 'index.html'));
     });
   }
 
@@ -56,5 +55,6 @@ async function startServer() {
 }
 
 startServer().catch(err => {
-  console.error('Failed to start server:', err);
+  console.error('CRITICAL: Failed to start server:', err);
+  process.exit(1);
 });
