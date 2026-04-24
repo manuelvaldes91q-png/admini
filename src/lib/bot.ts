@@ -49,27 +49,22 @@ export async function initBot() {
     ['👥 Clientes', '⚡ Planes']
   ]).resize();
 
-  bot.start((ctx) => ctx.reply('🚀 Mikrotik ISP Manager Bot Online.', mainKeyboard));
+  // --- Logic Handlers ---
+  const handleStatus = async (ctx: any) => {
+    const clients = db.prepare('SELECT * FROM clients').all() as any[];
+    const active = clients.filter(c => c.status === 'active').length;
+    const inactive = clients.length - active;
 
-  // Handle Menu Buttons
-  bot.hears('📊 Status', (ctx) => (bot as any).handleCommand('/status', ctx));
-  bot.hears('🔍 Descubrir', (ctx) => (bot as any).handleCommand('/descubrir', ctx));
-  bot.hears('👥 Clientes', (ctx) => (bot as any).handleCommand('/clientes', ctx));
-  bot.hears('⚡ Planes', (ctx) => (bot as any).handleCommand('/planes', ctx));
+    let msg = `📊 *ESTADO DEL SISTEMA ISP*\n\n`;
+    msg += `👥 Total Clientes: ${clients.length}\n`;
+    msg += `✅ Activos: ${active}\n`;
+    msg += `🚫 Suspendidos: ${inactive}\n\n`;
+    msg += `💡 Usa /clientes para gestionar a cada uno.`;
 
-  bot.command('help', (ctx) => {
-    ctx.reply(
-      '📋 *Comandos Disponibles:*\n\n' +
-      '/status - 📊 Resumen de la red y clientes\n' +
-      '/descubrir - 🔍 Buscar nuevos dispositivos (Leases)\n' +
-      '/clientes - 👥 Gestionar clientes registrados\n' +
-      '/planes - ⚡ Ver planes de velocidad disponibles',
-      { parse_mode: 'Markdown' }
-    );
-  });
+    ctx.reply(msg, { parse_mode: 'Markdown' });
+  };
 
-  // Discovery: Find unregistered leases
-  bot.command('descubrir', async (ctx) => {
+  const handleDiscovery = async (ctx: any) => {
     try {
       ctx.reply('🔎 Escaneando red Mikrotik...');
       const mtData = await getSyncData();
@@ -96,6 +91,53 @@ export async function initBot() {
     } catch (err: any) {
       ctx.reply(`❌ Error al descubrir: ${err.message}`);
     }
+  };
+
+  const handleClients = (ctx: any) => {
+    const clients = db.prepare('SELECT * FROM clients').all() as any[];
+    if (clients.length === 0) return ctx.reply('No hay clientes registrados.');
+
+    ctx.reply('👥 *Gestión de Clientes registrados:*', {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(
+        clients.map(c => [
+          Markup.button.callback(`${c.name} (${c.ip})`, `show_client:${c.id}`)
+        ])
+      )
+    });
+  };
+
+  const handlePlanes = (ctx: any) => {
+    const plans = db.prepare('SELECT * FROM plans').all() as any[];
+    let msg = '⚡ *Planes Configurados:*\n\n';
+    plans.forEach(p => {
+      msg += `🔹 *${p.name}:* ↓${p.download_limit} Mbps / ↑${p.upload_limit} Mbps\n`;
+    });
+    ctx.reply(msg, { parse_mode: 'Markdown' });
+  };
+
+  bot.start((ctx) => ctx.reply('🚀 Mikrotik ISP Manager Bot Online.', mainKeyboard));
+
+  // Handle Menu Buttons
+  bot.hears('📊 Status', handleStatus);
+  bot.hears('🔍 Descubrir', handleDiscovery);
+  bot.hears('👥 Clientes', handleClients);
+  bot.hears('⚡ Planes', handlePlanes);
+
+  bot.command('status', handleStatus);
+  bot.command('descubrir', handleDiscovery);
+  bot.command('clientes', handleClients);
+  bot.command('planes', handlePlanes);
+
+  bot.command('help', (ctx) => {
+    ctx.reply(
+      '📋 *Comandos Disponibles:*\n\n' +
+      '/status - 📊 Resumen de la red y clientes\n' +
+      '/descubrir - 🔍 Buscar nuevos dispositivos (Leases)\n' +
+      '/clientes - 👥 Gestionar clientes registrados\n' +
+      '/planes - ⚡ Ver planes de velocidad disponibles',
+      { parse_mode: 'Markdown' }
+    );
   });
 
   // Action for choosing a device from discovery
@@ -135,35 +177,6 @@ export async function initBot() {
     } catch (err: any) {
       ctx.reply(`❌ Error en el proceso: ${err.message}`);
     }
-  });
-
-  // Detailed Status and Monitoring
-  bot.command('status', async (ctx) => {
-    const clients = db.prepare('SELECT * FROM clients').all() as any[];
-    const active = clients.filter(c => c.status === 'active').length;
-    const inactive = clients.length - active;
-
-    let msg = `📊 *ESTADO DEL SISTEMA ISP*\n\n`;
-    msg += `👥 Total Clientes: ${clients.length}\n`;
-    msg += `✅ Activos: ${active}\n`;
-    msg += `🚫 Suspendidos: ${inactive}\n\n`;
-    msg += `💡 Usa /clientes para gestionar a cada uno.`;
-
-    ctx.reply(msg, { parse_mode: 'Markdown' });
-  });
-
-  bot.command('clientes', (ctx) => {
-    const clients = db.prepare('SELECT * FROM clients').all() as any[];
-    if (clients.length === 0) return ctx.reply('No hay clientes registrados.');
-
-    ctx.reply('👥 *Gestión de Clientes registrados:*', {
-      parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard(
-        clients.map(c => [
-          Markup.button.callback(`${c.name} (${c.ip})`, `show_client:${c.id}`)
-        ])
-      )
-    });
   });
 
   // Client Details View
@@ -233,15 +246,6 @@ export async function initBot() {
     } catch (err: any) {
       ctx.reply(`❌ Error: ${err.message}`);
     }
-  });
-
-  bot.command('planes', (ctx) => {
-    const plans = db.prepare('SELECT * FROM plans').all() as any[];
-    let msg = '⚡ *Planes Configurados:*\n\n';
-    plans.forEach(p => {
-      msg += `🔹 *${p.name}:* ↓${p.download_limit} Mbps / ↑${p.upload_limit} Mbps\n`;
-    });
-    ctx.reply(msg, { parse_mode: 'Markdown' });
   });
 
   try {
