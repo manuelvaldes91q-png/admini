@@ -4,16 +4,26 @@ import { provisionClient, setClientStatus, updateClientSpeed, getSyncData } from
 
 let bot: Telegraf | null = null;
 
-export function initBot() {
-  const token = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_token') as any;
-  const chatId = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any;
+export async function initBot() {
+  const token = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_token') as any)?.value;
+  const chatId = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any)?.value;
   
-  if (!token?.value) {
+  if (!token) {
     console.warn('Telegram token not found in settings. Bot not initialized.');
     return;
   }
 
-  bot = new Telegraf(token.value);
+  // Stop existing instance if any
+  if (bot) {
+    try {
+      console.log('Stopping existing Telegram bot instance...');
+      bot.stop('SIGTERM');
+    } catch (e) {
+      console.error('Error stopping bot:', e);
+    }
+  }
+
+  bot = new Telegraf(token);
 
   // Auth Middleware: Only allow configured Chat IDs
   bot.use(async (ctx, next) => {
@@ -233,11 +243,6 @@ export function initBot() {
   console.log('Telegram bot started with Enhanced Interactive flow.');
 }
 
-export function restartBot() {
-  if (bot) {
-    try {
-      bot.stop('SIGTERM');
-    } catch (e) {}
-  }
-  initBot();
+export async function restartBot() {
+  await initBot();
 }
