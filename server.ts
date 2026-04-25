@@ -11,13 +11,25 @@ dotenv.config();
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+  // Fixed priority: process.env.PORT || 3000
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
   const isProduction = process.env.NODE_ENV === 'production' || process.argv.includes('--production');
 
-  console.log(`Starting server in ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} mode on port ${PORT}...`);
+  console.log(`----------------------------------------`);
+  console.log(`ISP Manager Starting...`);
+  console.log(`Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+  console.log(`Port: ${PORT}`);
+  console.log(`Environment: ${typeof (globalThis as any).Bun !== 'undefined' ? 'Bun' : 'Node.js'}`);
+  console.log(`----------------------------------------`);
 
   // Initialize Database
-  initDB();
+  try {
+    console.log('Initializing Database...');
+    initDB();
+    console.log('Database initialized successfully.');
+  } catch (dbErr) {
+    console.error('FAILED to initialize database:', dbErr);
+  }
 
   // Initialize Telegram Bot
   await initBot();

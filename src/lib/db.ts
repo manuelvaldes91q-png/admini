@@ -1,9 +1,44 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+let rawDb: any;
+let isBun = typeof (globalThis as any).Bun !== 'undefined';
 
-const db = new Database('isp_manager.db');
+function getRawDb() {
+  if (rawDb) return rawDb;
+
+  if (isBun) {
+    console.log('Running in Bun environment. Using bun:sqlite adapter.');
+    // @ts-ignore
+    const { Database } = require('bun:sqlite');
+    rawDb = new Database('isp_manager.db', { create: true });
+  } else {
+    console.log('Running in Node environment. Using better-sqlite3.');
+    const Database = require('better-sqlite3');
+    rawDb = new Database('isp_manager.db');
+  }
+  return rawDb;
+}
+
+// Compatibility wrapper
+const db = {
+  prepare: (sql: string) => {
+    const rdb = getRawDb();
+    const stmt = isBun ? rdb.query(sql) : rdb.prepare(sql);
+    return {
+      get: (...args: any[]) => isBun ? stmt.get(...args) : stmt.get(...args),
+      all: (...args: any[]) => isBun ? stmt.all(...args) : stmt.all(...args),
+      run: (...args: any[]) => {
+        if (isBun) {
+          return stmt.run(...args);
+        } else {
+          return stmt.run(...args);
+        }
+      }
+    };
+  },
+  exec: (sql: string) => isBun ? getRawDb().run(sql) : getRawDb().exec(sql)
+};
 
 export function initDB() {
+  const rdb = getRawDb(); // Ensure DB is initialized
   // Option to reset app via ENV
   if (process.env.RESET_APP === 'true') {
     console.log('RESET_APP=true detected. Clearing database...');
