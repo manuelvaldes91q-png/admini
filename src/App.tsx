@@ -913,13 +913,17 @@ export default function App() {
                     />
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Admin Chat ID</label>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Admin Chat IDs (Separados por coma)</label>
                     <input 
                       type="text"
+                      placeholder="Ej: 12345678, 87654321"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 outline-none font-mono text-sm focus:border-brand/40 text-indigo-300"
-                      value={config.tg_admin_chat_id || ''}
-                      onChange={(e) => setConfig({ ...config, tg_admin_chat_id: e.target.value })}
+                      value={config.tg_chat_id || ''}
+                      onChange={(e) => setConfig({ ...config, tg_chat_id: e.target.value })}
                     />
+                    <p className="text-[10px] text-zinc-600 mt-1">
+                      * Todos los IDs listados podrán usar los comandos del bot y recibirán alertas automáticas. Sepáralos con una coma (`,`).
+                    </p>
                   </div>
                   <button 
                     onClick={handleTestTelegram}

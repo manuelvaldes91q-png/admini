@@ -263,6 +263,20 @@ export async function initBot() {
   }
 }
 
+export async function sendNotification(message: string) {
+  if (!bot) return;
+  const chatIds = (db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any)?.value || '';
+  const ids = chatIds.split(',').map((id: string) => id.trim()).filter(Boolean);
+  
+  for (const id of ids) {
+    try {
+      await bot.telegram.sendMessage(id, message, { parse_mode: 'Markdown' });
+    } catch (err) {
+      console.error(`Error sending notification to ${id}:`, err);
+    }
+  }
+}
+
 export async function restartBot() {
   if (bot) {
     try {

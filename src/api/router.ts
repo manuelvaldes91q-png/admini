@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import db from '../lib/db.js';
 import { provisionClient, setClientStatus, updateClientSpeed, getSyncData, removeClient } from '../lib/mikrotik.js';
-import { restartBot } from '../lib/bot.js';
+import { restartBot, sendNotification } from '../lib/bot.js';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
@@ -84,27 +84,17 @@ router.post('/settings', authenticate, (req, res) => {
 });
 
 router.post('/test-telegram', authenticate, async (req, res) => {
-  const token = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_token') as any;
-  const chatId = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any;
-
-  if (!token?.value || !chatId?.value) {
-    return res.status(400).json({ error: 'Token o Chat ID no configurados' });
-  }
-
   try {
-    const { Telegraf } = await import('telegraf');
-    const testBot = new Telegraf(token.value);
-    const ids = chatId.value.split(',').map((id: string) => id.trim());
+    const chatIds = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_chat_id') as any;
+    const ids = (chatIds?.value || '').split(',').map((id: string) => id.trim()).filter(Boolean);
     
-    let sentCount = 0;
-    for (const id of ids) {
-      if (id) {
-        await testBot.telegram.sendMessage(id, '🔔 Prueba de conexión desde MikroTik Dashboard. ¡Tu bot esta funcionando!');
-        sentCount++;
-      }
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'No hay IDs de Chat configurados' });
     }
+
+    await sendNotification('🔔 *PRUEBA DE CONEXIÓN*\n\nSi estás viendo este mensaje, el bot está configurado correctamente para enviar notificaciones a este Chat ID.');
     
-    res.json({ success: true, message: `Mensaje enviado a ${sentCount} ID(s)` });
+    res.json({ success: true, message: `Mensaje de prueba enviado a ${ids.length} destinatario(s).` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -215,6 +205,8 @@ router.post('/clients', authenticate, async (req, res) => {
     db.prepare('INSERT INTO clients (id, name, mac, ip, plan_id, status) VALUES (?, ?, ?, ?, ?, ?)')
       .run(Date.now().toString(), name, mac, ip, plan_id, 'active');
 
+    sendNotification(`🆕 *CLIENTE REGISTRADO*\n👤 Nombre: ${name}\n💻 MAC: ${mac}\n🌐 IP: ${ip}\n⚡ Plan: ${plan.name}`);
+
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -231,6 +223,9 @@ router.patch('/clients/:id/status', authenticate, async (req, res) => {
   try {
     await setClientStatus(client.ip, status === 'active');
     db.prepare('UPDATE clients SET status = ? WHERE id = ?').run(status, id);
+    
+    sendNotification(`${status === 'active' ? '✅' : '🚫'} *ESTADO ACTUALIZADO*\n👤 Cliente: ${client.name}\n🌐 IP: ${client.ip}\n📍 Nuevo Estado: ${status === 'active' ? 'ACCESO HABILITADO' : 'INTERNET CORTADO'}`);
+    
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -253,6 +248,8 @@ router.patch('/clients/:id/plan', authenticate, async (req, res) => {
     // Update in local database
     db.prepare('UPDATE clients SET plan_id = ? WHERE id = ?').run(plan_id, id);
     
+    sendNotification(`⚡ *PLAN ACTUALIZADO*\n👤 Cliente: ${client.name}\n🌐 IP: ${client.ip}\n📦 Nuevo Plan: ${plan.name}\n🚀 Velocidad: ↓${plan.download_limit} / ↑${plan.upload_limit}`);
+
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -272,6 +269,8 @@ router.delete('/clients/:id', authenticate, async (req, res) => {
     // Remove from local database
     db.prepare('DELETE FROM clients WHERE id = ?').run(id);
     
+    sendNotification(`🗑️ *CLIENTE ELIMINADO*\n👤 Nombre: ${client.name}\n🌐 IP: ${client.ip}\n💻 MAC: ${client.mac}\n\n_El cliente ha sido removido de la base de datos y de MikroTik._`);
+
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
