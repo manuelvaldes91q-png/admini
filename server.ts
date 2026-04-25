@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { initDB } from './src/lib/db.js';
 import apiRouter from './src/api/router.js';
@@ -46,29 +47,47 @@ async function startServer() {
   app.use('/api', apiRouter);
 
   // Vite middleware or static serving
+  let vite: any = null;
   if (!isProduction) {
     try {
       console.log('Loading Vite middleware...');
-      // Dynamic import to avoid loading Vite in production bundle
       const { createServer } = await import('vite');
-      const vite = await createServer({
+      vite = await createServer({
         server: { middlewareMode: true },
         appType: 'spa',
       });
       app.use(vite.middlewares);
     } catch (e) {
-      console.error('Failed to load Vite. If this is production, please use NODE_ENV=production or --production flag.');
-      throw e;
+      console.error('Failed to load Vite middleware:', e);
     }
   } else {
     // In production, we serve static files from /dist
     const publicPath = path.join(process.cwd(), 'dist');
     console.log(`Serving static files from: ${publicPath}`);
     app.use(express.static(publicPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(publicPath, 'index.html'));
-    });
   }
+
+  // Final catch-all for SPA (must be AFTER api routes and vite/static middlewares)
+  app.get('*', async (req, res) => {
+    // Ignore API requests that weren't handled
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API route not found' });
+    }
+    
+    // In production, serve the built index.html
+    if (isProduction) {
+      const indexPath = path.join(process.cwd(), 'dist', 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        console.error(`ERROR: Production index.html NOT FOUND at ${indexPath}`);
+        res.status(500).send('Error de producción: La carpeta "dist" no contiene index.html. Por favor ejecuta "npm run build".');
+      }
+    } else {
+      // In dev, if Vite middleware somehow missed it, try regular static serve if it exists
+      res.status(404).send('Vite cargando... Si el error persiste, refresca la página. (Error 404)');
+    }
+  });
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server successfully running on http://0.0.0.0:${PORT}`);
