@@ -408,17 +408,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans selection:bg-brand/30 pb-20">
       {/* Top Navbar */}
-      <header className="glass-panel sticky top-0 z-50 px-4 md:px-8 py-4 flex items-center justify-between mx-auto md:m-4 md:rounded-2xl shadow-xl border-t border-white/5">
+      <header className="glass-panel sticky top-0 z-50 px-8 py-4 flex items-center justify-between m-4 rounded-2xl shadow-xl border-t border-white/5">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-4">
             <div className="bg-brand p-2 rounded-xl shadow-lg shadow-brand/20">
               <Activity size={20} className="text-black" />
             </div>
-            <div className="hidden sm:block">
+            <div>
               <h1 className="font-bold text-lg tracking-tight text-white">ISP Master</h1>
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                <span className="text-[10px] font-mono text-zinc-500">ROUTEROS ONLINE</span>
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">ROUTEROS ONLINE</span>
               </div>
             </div>
           </div>
@@ -439,7 +439,7 @@ export default function App() {
                 }`}
               >
                 <item.icon size={14} className={activeTab === item.id ? 'text-brand' : ''} />
-                <span className="hidden md:inline">{item.label}</span>
+                <span className="inline">{item.label}</span>
               </button>
             ))}
           </nav>
@@ -453,7 +453,7 @@ export default function App() {
           </div>
           <button 
             onClick={handleLogout}
-            className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase text-zinc-500 hover:text-red-400 transition-all px-2 py-1"
+            className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500 hover:text-red-400 transition-all px-2 py-1"
           >
             <LogOut size={16} />
             Salir
@@ -461,11 +461,11 @@ export default function App() {
         </div>
       </header>
 
-      <main className="p-4 md:p-8 max-w-[1600px] mx-auto">
+      <main className="p-8 max-w-[1600px] mx-auto min-w-[1100px]">
         {activeTab === 'clients' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-4 gap-6">
               {[
                 { label: 'Total Clientes', val: clients.length, icon: Users, color: 'text-blue-400', bg: 'bg-blue-400/5', border: 'border-blue-400/20' },
                 { label: 'Nodos Activos', val: clients.filter(c => c.status === 'active').length, icon: Shield, color: 'text-emerald-400', bg: 'bg-emerald-400/5', border: 'border-emerald-400/20' },
@@ -552,7 +552,7 @@ export default function App() {
 
             {/* Clients Panel */}
             <div className="tech-card rounded-2xl overflow-hidden">
-              <div className="p-6 border-b border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-900/50 gap-4">
+              <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50 gap-4">
                 <div className="flex items-center gap-4">
                   <div className="bg-zinc-800 p-2 rounded-xl">
                     <Users size={18} className="text-brand" />
@@ -562,13 +562,13 @@ export default function App() {
                     <p className="text-[10px] text-zinc-500 font-medium">{filteredClients.length} equipos en monitoreo</p>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                <div className="flex gap-4 w-auto">
                   <div className="relative group">
                     <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-brand transition-colors" />
                     <input 
                       type="text" 
                       placeholder="Buscar por IP, MAC..."
-                      className="bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-2.5 outline-none text-xs focus:border-brand/40 transition-all w-full sm:w-64 text-white"
+                      className="bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-2.5 outline-none text-xs focus:border-brand/40 transition-all w-64 text-white"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -712,7 +712,7 @@ export default function App() {
                          <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Arrendamientos Dinámicos (DHCP Leases)</span>
                       </div>
                     </div>
-                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="p-6 grid grid-cols-3 gap-6">
                       {syncData.leases.filter((l: any) => l.dynamic === 'true').map((lease: any, i: number) => {
                         const isRegistered = clients.some(c => c.mac.toLowerCase() === lease['mac-address'].toLowerCase());
                         return (
@@ -747,7 +747,7 @@ export default function App() {
             )}
 
             {syncData && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="grid grid-cols-2 gap-8">
                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="tech-card rounded-2xl overflow-hidden">
                     <div className="bg-zinc-900/80 p-5 border-b border-zinc-800 flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -839,7 +839,7 @@ export default function App() {
                 </button>
               </div>
               <div className="p-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-2 gap-8">
                   {[
                     { label: 'Host / IP Address', key: 'mt_host', icon: Search },
                     { label: 'API Port (8728)', key: 'mt_port', icon: Server },
@@ -865,7 +865,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-2 gap-8">
               <div className="tech-card rounded-2xl overflow-hidden">
                 <div className="p-6 border-b border-zinc-800 bg-zinc-900/80">
                   <div className="flex items-center gap-3">
