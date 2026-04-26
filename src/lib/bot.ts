@@ -84,7 +84,8 @@ export async function initBot() {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(
           unregistered.map((u: any) => [
-            Markup.button.callback(`IP: ${u.address} (${u['host-name'] || 'Sin nombre'})`, `reg_lease:${u.address}:${u['mac-address']}`)
+            // Usamos un formato más compacto para la data: l|IP|MAC (sin colones)
+            Markup.button.callback(`IP: ${u.address} (${u['host-name'] || 'Sin nombre'})`, `l|${u.address}|${u['mac-address'].replace(/:/g, '')}`)
           ])
         )
       });
@@ -140,9 +141,11 @@ export async function initBot() {
     );
   });
 
-  // Action for choosing a device from discovery
-  bot.action(/^reg_lease:([^:]+):(.+)$/, async (ctx) => {
-    const [_, ip, mac] = ctx.match;
+  // Action for choosing a device from discovery (Compact)
+  bot.action(/^l\|([^|]+)\|(.+)$/, async (ctx) => {
+    const [_, ip, macNoColons] = ctx.match;
+    // Restaurar MAC con colones para uso interno
+    const mac = macNoColons.match(/.{1,2}/g)?.join(':') || macNoColons;
     const plans = db.prepare('SELECT * FROM plans').all() as any[];
     
     ctx.answerCbQuery();
@@ -150,15 +153,17 @@ export async function initBot() {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard(
         plans.map(p => [
-          Markup.button.callback(`${p.name} (↓${p.download_limit} ↑${p.upload_limit})`, `confirm_reg:${ip}:${mac}:${p.id}`)
+          // l2|IP|MAC_NO_COLONS|PLAN_ID (ID debe ser corto)
+          Markup.button.callback(`${p.name} (↓${p.download_limit} ↑${p.upload_limit})`, `l2|${ip}|${macNoColons}|${p.id}`)
         ])
       )
     });
   });
 
-  // Final confirmation of registration
-  bot.action(/^confirm_reg:([^:]+):(.+):([^:]+)$/, async (ctx) => {
-    const [_, ip, mac, planId] = ctx.match;
+  // Final confirmation of registration (Compact)
+  bot.action(/^l2\|([^|]+)\|([^|]+)\|(.+)$/, async (ctx) => {
+    const [_, ip, macNoColons, planId] = ctx.match;
+    const mac = macNoColons.match(/.{1,2}/g)?.join(':') || macNoColons;
     const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(planId) as any;
     const name = `Cliente-${ip.split('.').pop()}`;
 
@@ -183,7 +188,7 @@ export async function initBot() {
   });
 
   // Action to start changing plan
-  bot.action(/^change_p_start:(.+)$/, async (ctx) => {
+  bot.action(/^change_p_start:([^:]+)$/, async (ctx) => {
     const clientId = ctx.match[1];
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId) as any;
     const plans = db.prepare('SELECT * FROM plans').all() as any[];
@@ -195,14 +200,15 @@ export async function initBot() {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard(
         plans.map(p => [
-          Markup.button.callback(`${p.name} (↓${p.download_limit} ↑${p.upload_limit})`, `confirm_ch_p:${clientId}:${p.id}`)
+          // cp|CLID|PLID
+          Markup.button.callback(`${p.name} (↓${p.download_limit} ↑${p.upload_limit})`, `cp|${clientId}|${p.id}`)
         ]).concat([[Markup.button.callback('⬅️ Cancelar', `show_client:${clientId}`)]])
       )
     });
   });
 
   // Confirm plan change
-  bot.action(/^confirm_ch_p:([^:]+):([^:]+)$/, async (ctx) => {
+  bot.action(/^cp\|([^|]+)\|(.+)$/, async (ctx) => {
     const [_, clientId, planId] = ctx.match;
     const clientData = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId) as any;
     const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(planId) as any;
