@@ -141,7 +141,7 @@ export async function initBot() {
   });
 
   // Action for choosing a device from discovery
-  bot.action(/^reg_lease:(.+):(.+)$/, async (ctx) => {
+  bot.action(/^reg_lease:([^:]+):(.+)$/, async (ctx) => {
     const [_, ip, mac] = ctx.match;
     const plans = db.prepare('SELECT * FROM plans').all() as any[];
     
@@ -157,7 +157,7 @@ export async function initBot() {
   });
 
   // Final confirmation of registration
-  bot.action(/^confirm_reg:(.+):(.+):(.+)$/, async (ctx) => {
+  bot.action(/^confirm_reg:([^:]+):(.+):([^:]+)$/, async (ctx) => {
     const [_, ip, mac, planId] = ctx.match;
     const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(planId) as any;
     const name = `Cliente-${ip.split('.').pop()}`;
@@ -174,8 +174,53 @@ export async function initBot() {
         .run(Date.now().toString(), name, mac, ip, planId, 'active');
 
       ctx.editMessageText(`✨ *ÉXITO:* Cliente registrado.\n👤 Nombre: ${name}\n🌐 IP: ${ip}\n⚡ Plan: ${plan.name}`, { parse_mode: 'Markdown' });
+      
+      // Notificar a todos los admins
+      sendNotification(`🆕 *CLIENTE REGISTRADO (Bot)*\n👤 Nombre: ${name}\n🌐 IP: ${ip}\n⚡ Plan: ${plan.name}`);
     } catch (err: any) {
       ctx.reply(`❌ Error en el proceso: ${err.message}`);
+    }
+  });
+
+  // Action to start changing plan
+  bot.action(/^change_p_start:(.+)$/, async (ctx) => {
+    const clientId = ctx.match[1];
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId) as any;
+    const plans = db.prepare('SELECT * FROM plans').all() as any[];
+    
+    if (!client) return ctx.answerCbQuery('Cliente no encontrado');
+
+    ctx.answerCbQuery();
+    ctx.editMessageText(`⚡ *Cambiar plan para:* ${client.name}\nSelecciona el nuevo plan:`, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(
+        plans.map(p => [
+          Markup.button.callback(`${p.name} (↓${p.download_limit} ↑${p.upload_limit})`, `confirm_ch_p:${clientId}:${p.id}`)
+        ]).concat([[Markup.button.callback('⬅️ Cancelar', `show_client:${clientId}`)]])
+      )
+    });
+  });
+
+  // Confirm plan change
+  bot.action(/^confirm_ch_p:([^:]+):([^:]+)$/, async (ctx) => {
+    const [_, clientId, planId] = ctx.match;
+    const clientData = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId) as any;
+    const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(planId) as any;
+
+    if (!clientData || !plan) return ctx.reply('❌ Error al obtener datos del cliente o plan.');
+
+    try {
+      await updateClientSpeed(clientData.name, clientData.ip, plan.upload_limit, plan.download_limit);
+      db.prepare('UPDATE clients SET plan_id = ? WHERE id = ?').run(planId, clientId);
+      
+      ctx.editMessageText(`✅ *PLAN ACTUALIZADO:* ${clientData.name}\n🚀 Nuevo Plan: ${plan.name}`, { 
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Volver a Detalles', `show_client:${clientId}`)]])
+      });
+      
+      sendNotification(`⚡ *PLAN CAMBIADO (Bot)*\n👤 Cliente: ${clientData.name}\n📦 Nuevo Plan: ${plan.name}`);
+    } catch (err: any) {
+      ctx.reply(`❌ Error: ${err.message}`);
     }
   });
 
@@ -219,7 +264,7 @@ export async function initBot() {
   });
 
   // Toggle Service Status
-  bot.action(/^toggle_serv:(.+):(.+)$/, async (ctx) => {
+  bot.action(/^toggle_serv:([^:]+):([^:]+)$/, async (ctx) => {
     const [_, id, currentStatus] = ctx.match;
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     const client = db.prepare('SELECT ip FROM clients WHERE id = ?').get(id) as any;
