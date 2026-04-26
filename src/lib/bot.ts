@@ -295,15 +295,15 @@ export async function initBot() {
 
   try {
     await bot.launch();
-    console.log('Telegram bot started with Enhanced Interactive flow.');
+    console.log('✅ Telegram bot started successfully with multiple admin support.');
   } catch (err: any) {
-    if (err.response?.error_code === 409 || err.message?.includes('409')) {
-      console.error('CRITICAL: Telegram 409 Conflict. Another instance is already running.');
-      console.error('Check your VPS or PM2 processes. Use: pm2 status');
+    if (err.response?.error_code === 409 || err.message?.includes('409') || err.description?.includes('conflict')) {
+      console.error('❌ CRITICAL: Telegram Bot Conflict (409). Another instance is running.');
+      console.error('If you are on a VPS, use: pm2 restart all OR pkill -f node');
     } else if (err.code === 'ETIMEDOUT') {
-      console.error('CRITICAL: Connection to Telegram API timed out. Check your internet/DNS.');
+      console.error('❌ CRITICAL: Telegram API Timeout. Check internet connection.');
     } else {
-      console.error('Telegram bot failed to launch:', err.message);
+      console.error('❌ Telegram bot failed to launch:', err.message || err);
     }
   }
 }

@@ -71,14 +71,16 @@ router.post('/settings', authenticate, (req, res) => {
   if (mt_user !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(mt_user, 'mt_user');
   if (mt_pass !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(mt_pass, 'mt_pass');
   if (mt_interface !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(mt_interface, 'mt_interface');
-  if (tg_chat_id !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(tg_chat_id, 'tg_chat_id');
-  if (admin_user !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(admin_user, 'admin_user');
-  if (admin_pass !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(admin_pass, 'admin_pass');
-  
+  if (tg_chat_id !== undefined) {
+    db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(tg_chat_id, 'tg_chat_id');
+    restartBot();
+  }
   if (tg_token !== undefined) {
     db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(tg_token, 'tg_token');
     restartBot();
   }
+  if (admin_user !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(admin_user, 'admin_user');
+  if (admin_pass !== undefined) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(admin_pass, 'admin_pass');
   
   res.json({ success: true });
 });
