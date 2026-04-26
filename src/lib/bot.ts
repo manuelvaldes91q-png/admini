@@ -1,6 +1,6 @@
 import { Telegraf, Markup } from 'telegraf';
 import db from './db.js';
-import { provisionClient, setClientStatus, updateClientSpeed, getSyncData } from './mikrotik.js';
+import { provisionClient, setClientStatus, updateClientSpeed, getSyncData, removeClient } from './mikrotik.js';
 
 let bot: Telegraf | null = null;
 
@@ -71,22 +71,41 @@ export async function initBot() {
   const handleDiscovery = async (ctx: any) => {
     pendingState.delete(ctx.from.id);
     try {
-      ctx.reply('🔎 Escaneando red Mikrotik...');
+      ctx.reply('🔎 Escaneando red Mikrotik (Leases dinámicos)...');
       const mtData = await getSyncData();
       const registeredClients = db.prepare('SELECT mac, ip FROM clients').all() as any[];
       
       const unregistered = mtData.leases.filter((lease: any) => {
         if (!lease.address || !lease['mac-address']) return false;
+        
+        // Un lease es "autorizable" si es dinámico (dynamic=true)
         const isDynamic = String(lease.dynamic) === 'true';
+        
+        // Verificar si ya está registrado en la DB local (por IP o por MAC)
         const isRegistered = registeredClients.some(c => 
-          (c.mac?.toLowerCase() === (lease['mac-address'] || '').toLowerCase()) || 
+          (c.mac && c.mac.toLowerCase() === lease['mac-address'].toLowerCase()) || 
           (c.ip === lease.address)
         );
+        
         return isDynamic && !isRegistered;
       });
 
       if (unregistered.length === 0) {
-        return ctx.reply(`✅ No se encontraron nuevos dispositivos dinámicos para autorizar.\n\n📡 Total leases en Mikrotik: ${mtData.leases.length}\n👥 Clientes registrados: ${registeredClients.length}`);
+        let debugInfo = `✅ No se encontraron nuevos dispositivos dinámicos para autorizar.\n\n`;
+        debugInfo += `📡 Total Leases en MK: ${mtData.leases.length}\n`;
+        debugInfo += `👥 Clientes en DB Local: ${registeredClients.length}\n\n`;
+        
+        // Buscar la IP específica que el usuario menciona si existe en los leases para dar feedback
+        const targetIp = '192.168.88.15'; // IP que el usuario menciona
+        const lease8815 = mtData.leases.find((l: any) => l.address === targetIp);
+        
+        if (lease8815) {
+          const isDyn = String(lease8815.dynamic) === 'true';
+          const reg = registeredClients.find(c => c.ip === targetIp || c.mac?.toLowerCase() === lease8815['mac-address']?.toLowerCase());
+          debugInfo += `🔍 Debug IP ${targetIp}:\n- Dinámico: ${isDyn ? 'SÍ' : 'NO'}\n- Registrado DB: ${reg ? 'SÍ (' + reg.mac + ')' : 'NO'}`;
+        }
+
+        return ctx.reply(debugInfo);
       }
 
       ctx.reply(`📡 *Dispositivos encontrados:* ${unregistered.length}\nSelecciona uno para autorizar:`, {
@@ -283,9 +302,46 @@ export async function initBot() {
           Markup.button.callback(client.status === 'active' ? '🚫 Cortar Acceso' : '✅ Activar Acceso', `toggle_serv:${client.id}:${client.status}`),
           Markup.button.callback('⚡ Cambiar Plan', `change_p_start:${client.id}`)
         ],
+        [Markup.button.callback('🗑️ Eliminar Cliente', `confirm_del_prompt:${client.id}`)],
         [Markup.button.callback('⬅️ Volver a Lista', 'clientes_back')]
       ])
     });
+  });
+
+  // Delete Prompt
+  bot.action(/^confirm_del_prompt:(.+)$/, async (ctx) => {
+    const clientId = ctx.match[1];
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId) as any;
+    if (!client) return ctx.answerCbQuery('Cliente no encontrado');
+
+    ctx.answerCbQuery();
+    ctx.editMessageText(`⚠️ *¿ELIMINAR CLIENTE?*\n\nSe eliminará a *${client.name}* (${client.ip}) de:\n1. Mikrotik (Lease, Queue, ARP)\n2. Base de datos local\n\n¿Estás seguro?`, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🗑️ SÍ, ELIMINAR', `delete_full:${clientId}`)],
+        [Markup.button.callback('❌ Cancelar', `show_client:${clientId}`)]
+      ])
+    });
+  });
+
+  // Final Delete Action
+  bot.action(/^delete_full:(.+)$/, async (ctx) => {
+    const clientId = ctx.match[1];
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId) as any;
+    
+    if (!client) return ctx.answerCbQuery('Cliente ya eliminado');
+
+    try {
+      // Intentar borrar del MK (incluso si ya lo borró el usuario, capturamos el error)
+      await removeClient(client.name, client.ip, client.mac).catch(() => null);
+      
+      db.prepare('DELETE FROM clients WHERE id = ?').run(clientId);
+      ctx.answerCbQuery('✅ Cliente eliminado');
+      ctx.editMessageText(`🗑️ *Cliente eliminado con éxito:*\n👤 Nombre: ${client.name}\n🌐 IP: ${client.ip}\n\nSe ha limpiado de la base de datos local.`);
+      sendNotification(`🗑️ *CLIENTE ELIMINADO (Bot)*\n👤 Nombre: ${client.name}\n🌐 IP: ${client.ip}`);
+    } catch (err: any) {
+      ctx.reply(`❌ Error al procesar eliminación: ${err.message}`);
+    }
   });
 
   bot.action('clientes_back', (ctx) => {
@@ -319,12 +375,13 @@ export async function initBot() {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [
-            Markup.button.callback(updatedClient.status === 'active' ? '🚫 Cortar Acceso' : '✅ Activar Acceso', `toggle_serv:${updatedClient.id}:${updatedClient.status}`),
-            Markup.button.callback('⚡ Cambiar Plan', `change_p_start:${updatedClient.id}`)
-          ],
-          [Markup.button.callback('⬅️ Volver a Lista', 'clientes_back')]
-        ])
-      });
+          Markup.button.callback(updatedClient.status === 'active' ? '🚫 Cortar Acceso' : '✅ Activar Acceso', `toggle_serv:${updatedClient.id}:${updatedClient.status}`),
+          Markup.button.callback('⚡ Cambiar Plan', `change_p_start:${updatedClient.id}`)
+        ],
+        [Markup.button.callback('🗑️ Eliminar Cliente', `confirm_del_prompt:${updatedClient.id}`)],
+        [Markup.button.callback('⬅️ Volver a Lista', 'clientes_back')]
+      ])
+    });
     } catch (err: any) {
       ctx.reply(`❌ Error: ${err.message}`);
     }
