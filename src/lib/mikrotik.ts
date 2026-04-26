@@ -94,13 +94,15 @@ export async function provisionClient(clientData: { name: string; mac: string; i
       await client.write('/queue/simple/set', [
         `=.id=${queueList[0]['.id']}`,
         `=target=${clientData.ip}`,
-        `=max-limit=${maxLimit}`
+        `=max-limit=${maxLimit}`,
+        `=comment=${clientData.name}`
       ]);
     } else {
       await client.write('/queue/simple/add', [
         `=name=${clientData.name}`,
         `=target=${clientData.ip}`,
-        `=max-limit=${maxLimit}`
+        `=max-limit=${maxLimit}`,
+        `=comment=${clientData.name}`
       ]);
     }
 
