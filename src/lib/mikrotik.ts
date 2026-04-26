@@ -194,3 +194,35 @@ export async function getSyncData() {
     client.close();
   }
 }
+
+export async function reconcileClientsWithMikrotik() {
+  try {
+    // 1. Obtener datos actuales de Mikrotik
+    const mtData = await getSyncData();
+    
+    // 2. Obtener clientes de la DB local
+    const localClients = db.prepare('SELECT id, name, ip, mac FROM clients').all() as any[];
+
+    for (const client of localClients) {
+      if (!client.mac && !client.name) continue;
+
+      // Un cliente se considera "vivo" si tiene al menos un Lease o una Queue con su nombre/MAC
+      const leaseExists = mtData.leases.some((l: any) => 
+        l['mac-address']?.toLowerCase() === client.mac?.toLowerCase()
+      );
+      
+      const queueExists = mtData.queues.some((q: any) => 
+        q.name === client.name || q.target?.includes(client.ip)
+      );
+
+      // Si no existe ni el lease ni la queue, el cliente fue borrado manualmente en el Mikrotik
+      if (!leaseExists && !queueExists) {
+        console.log(`[Auto-Sync] El Cliente "${client.name}" (${client.ip}) ya no existe en Mikrotik. Eliminando de DB local.`);
+        db.prepare('DELETE FROM clients WHERE id = ?').run(client.id);
+      }
+    }
+  } catch (err: any) {
+    // Silently fail to avoid polluting logs if Mikrotik is briefly unreachable
+    // console.error('[Auto-Sync Error]:', err.message);
+  }
+}

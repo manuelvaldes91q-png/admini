@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { initDB } from './src/lib/db.js';
 import apiRouter from './src/api/router.js';
 import { initBot } from './src/lib/bot.js';
+import { reconcileClientsWithMikrotik } from './src/lib/mikrotik.js';
 
 dotenv.config();
 
@@ -34,6 +35,15 @@ async function startServer() {
 
   // Initialize Telegram Bot
   await initBot();
+
+  // Background Sync: Reconcile local DB with Mikrotik every 30 seconds
+  setInterval(async () => {
+    try {
+      await reconcileClientsWithMikrotik();
+    } catch (e) {
+      // Ignore background errors
+    }
+  }, 30000);
 
   app.use(cors());
   app.use(cookieParser());
