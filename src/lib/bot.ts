@@ -49,8 +49,12 @@ export async function initBot() {
     ['👥 Clientes', '⚡ Planes']
   ]).resize();
 
+  // State tracker for interactive flows
+  const pendingState = new Map<number, any>();
+
   // --- Logic Handlers ---
   const handleStatus = async (ctx: any) => {
+    pendingState.delete(ctx.from.id);
     const clients = db.prepare('SELECT * FROM clients').all() as any[];
     const active = clients.filter(c => c.status === 'active').length;
     const inactive = clients.length - active;
@@ -65,19 +69,24 @@ export async function initBot() {
   };
 
   const handleDiscovery = async (ctx: any) => {
+    pendingState.delete(ctx.from.id);
     try {
       ctx.reply('🔎 Escaneando red Mikrotik...');
       const mtData = await getSyncData();
       const registeredClients = db.prepare('SELECT mac, ip FROM clients').all() as any[];
       
       const unregistered = mtData.leases.filter((lease: any) => {
-        const isDynamic = lease.dynamic === 'true';
-        const isRegistered = registeredClients.some(c => c.mac === lease['mac-address'] || c.ip === lease.address);
+        if (!lease.address || !lease['mac-address']) return false;
+        const isDynamic = String(lease.dynamic) === 'true';
+        const isRegistered = registeredClients.some(c => 
+          (c.mac?.toLowerCase() === (lease['mac-address'] || '').toLowerCase()) || 
+          (c.ip === lease.address)
+        );
         return isDynamic && !isRegistered;
       });
 
       if (unregistered.length === 0) {
-        return ctx.reply('✅ No se encontraron nuevos dispositivos para autorizar.');
+        return ctx.reply(`✅ No se encontraron nuevos dispositivos dinámicos para autorizar.\n\n📡 Total leases en Mikrotik: ${mtData.leases.length}\n👥 Clientes registrados: ${registeredClients.length}`);
       }
 
       ctx.reply(`📡 *Dispositivos encontrados:* ${unregistered.length}\nSelecciona uno para autorizar:`, {
@@ -144,28 +153,49 @@ export async function initBot() {
   // Action for choosing a device from discovery (Compact)
   bot.action(/^l\|([^|]+)\|(.+)$/, async (ctx) => {
     const [_, ip, macNoColons] = ctx.match;
-    // Restaurar MAC con colones para uso interno
     const mac = macNoColons.match(/.{1,2}/g)?.join(':') || macNoColons;
-    const plans = db.prepare('SELECT * FROM plans').all() as any[];
     
+    pendingState.set(ctx.from!.id, { type: 'register_naming', ip, mac });
     ctx.answerCbQuery();
-    ctx.reply(`⚙️ *Provisionamiento para:* ${ip}\nSelecciona el plan de velocidad:`, {
+    ctx.reply(`📝 *IP:* ${ip}\n*MAC:* ${mac}\n\n👉 *Escribe el nombre del cliente:*`, { parse_mode: 'Markdown' });
+  });
+
+  // Handle text input for naming
+  bot.on('text', async (ctx, next) => {
+    const state = pendingState.get(ctx.from.id);
+    if (!state || state.type !== 'register_naming') return next();
+
+    const name = ctx.message.text.trim();
+    if (name.length < 3) return ctx.reply('⚠️ El nombre es muy corto. Intenta de nuevo:');
+    if (name.length > 50) return ctx.reply('⚠️ El nombre es muy largo. Intenta de nuevo:');
+
+    state.name = name;
+    state.type = 'register_planning';
+    pendingState.set(ctx.from.id, state);
+
+    const plans = db.prepare('SELECT * FROM plans').all() as any[];
+    ctx.reply(`⚡ *Selecciona el plan para:* ${name}`, {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard(
         plans.map(p => [
-          // l2|IP|MAC_NO_COLONS|PLAN_ID (ID debe ser corto)
-          Markup.button.callback(`${p.name} (↓${p.download_limit} ↑${p.upload_limit})`, `l2|${ip}|${macNoColons}|${p.id}`)
+          // USAR ID DEL PLAN EN CALLBACK
+          Markup.button.callback(`${p.name} (↓${p.download_limit} ↑${p.upload_limit})`, `l3|${p.id}`)
         ])
       )
     });
   });
 
-  // Final confirmation of registration (Compact)
-  bot.action(/^l2\|([^|]+)\|([^|]+)\|(.+)$/, async (ctx) => {
-    const [_, ip, macNoColons, planId] = ctx.match;
-    const mac = macNoColons.match(/.{1,2}/g)?.join(':') || macNoColons;
+  // Final confirmation of registration (State-based)
+  bot.action(/^l3\|(.+)$/, async (ctx) => {
+    const planId = ctx.match[1];
+    const state = pendingState.get(ctx.from!.id);
+    
+    if (!state || state.type !== 'register_planning') {
+      return ctx.answerCbQuery('Sesión expirada. Inicia de nuevo con /descubrir');
+    }
+
+    const { ip, mac, name } = state;
     const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(planId) as any;
-    const name = `Cliente-${ip.split('.').pop()}`;
 
     try {
       await provisionClient({
@@ -182,6 +212,7 @@ export async function initBot() {
       
       // Notificar a todos los admins
       sendNotification(`🆕 *CLIENTE REGISTRADO (Bot)*\n👤 Nombre: ${name}\n🌐 IP: ${ip}\n⚡ Plan: ${plan.name}`);
+      pendingState.delete(ctx.from!.id);
     } catch (err: any) {
       ctx.reply(`❌ Error en el proceso: ${err.message}`);
     }
